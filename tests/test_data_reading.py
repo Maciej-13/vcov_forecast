@@ -2,6 +2,7 @@ import unittest
 import pandas as pd
 
 from vcov_forecast.modules.data_handling.data_reading import YahooDataReader
+from vcov_forecast.modules.data_handling.data_reading import YahooMultipleTickersReader
 
 
 class TestYahooDataReader(unittest.TestCase):
@@ -48,3 +49,26 @@ class TestYahooDataReader(unittest.TestCase):
         self.assertEqual(data[0], 143301900)
         self.assertEqual(data.name, "Volume")
 
+
+class TestYahooMultipleTickersReader(unittest.TestCase):
+
+    def setUp(self) -> None:
+        self.yreader = YahooMultipleTickersReader('AAPL NFLX', start="2021-01-04", end="2021-01-14")
+
+    def test_get_data(self):
+        data = self.yreader.get_data()
+        self.assertIsInstance(data, pd.DataFrame)
+        self.assertEqual(len(data), 8)
+
+    def test_get_tickers(self):
+        tickers = self.yreader.get_tickers()
+        self.assertEqual(len(tickers), 2)
+        for tick in tickers:
+            self.assertIn(tick, ['AAPL', 'NFLX'])
+
+    def test_get_columns(self):
+        data = self.yreader.get_columns('Open')
+        self.assertEqual(len(data.columns), 2)
+        self.assertEqual(list(data.columns[0])[0], 'Open')
+        data = self.yreader.get_columns('Open', single_index=True)
+        self.assertEqual(data.columns[0].split(' ')[0], 'Open')

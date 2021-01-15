@@ -6,8 +6,7 @@ from vcov_forecast.modules.data_handling.data_reading import YahooDataReader
 
 class TestYahooDataReader(unittest.TestCase):
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    def setUp(self):
         self.yreader = YahooDataReader("AAPL", start="2021-01-04", end="2021-01-14")
 
     def test_get_data(self):

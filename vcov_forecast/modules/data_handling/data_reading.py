@@ -1,4 +1,5 @@
 import yfinance as yf
+import pandas as pd
 
 from warnings import warn
 from beartype import beartype
@@ -45,7 +46,7 @@ class YahooDataReader:
             self.__ticker = self.__ticker.split(" ")[0]
 
 
-class YahooMultipleTickersReader:
+class YahooReader:
 
     @beartype
     def __init__(self, tickers: (list, str), *args, **kwargs):
@@ -55,27 +56,78 @@ class YahooMultipleTickersReader:
     @beartype
     def get_data(self, single_index: bool = False):
         if not single_index:
-            return self.__data
-        return self.__flatten_index(self.__data)
+            return self.__data.copy()
+        return self.__flatten_index(self.__data.copy())
 
-    def get_columns(self, columns: (list, str), tickers: (list, NoneType) = None, single_index: bool = False):
+    @beartype
+    def get_columns(self, columns: (list, str), tickers: (list, str, NoneType) = None, single_index: bool = False):
         columns = [col.title() for col in columns] if isinstance(columns, list) else [columns.title()]
-        col_names = list(product(columns, self.__tickers)) if tickers is None else list(product(columns, tickers))
+        tickers = self.__check_tickers_type(tickers)
+        col_names = list(product(columns, tickers))
         if not single_index:
             return self.__data.copy()[col_names]
-        return self.__flatten_index(self.__data[col_names])
+        else:
+            return self.__flatten_index(self.__data[col_names])
 
-    def get_tickers(self):
+    def get_all_tickers(self):
         return self.__tickers
 
+    @beartype
+    def get_data_by_tickers(self, tickers: (str, list), single_index: bool = False):
+        tickers = self.__check_tickers_type(tickers)
+        if set(tickers).issubset(self.__tickers):
+            data = self.__data.loc[:, pd.IndexSlice[:, tickers]]
+            if single_index:
+                data = self.__flatten_index(data)
+            return data
+        else:
+            raise KeyError(f'There is no such ticker as {tickers}. Available tickers are: {self.get_all_tickers()}')
+
+    @beartype
+    def save(self, path: str, single_file: bool = True, columns: (list, str, NoneType) = None,
+             tickers: (list, str, NoneType) = None, single_index: bool = False):
+        if columns is not None:
+            data = self.get_columns(columns=columns, tickers=tickers, single_index=single_index)
+        elif tickers is not None:
+            data = self.get_data_by_tickers(tickers=tickers, single_index=single_index)
+        else:
+            data = self.get_data(single_index=single_index)
+
+        tickers = self.__check_tickers_type(tickers)
+
+        if single_file:
+            data.to_csv(path)
+
+        elif not single_index:
+            for ticker in tickers:
+                new_data = data.loc[:, pd.IndexSlice[:, ticker]]
+                new_data.to_csv(path + '/' + ticker + '.csv')
+
+        else:
+            for ticker in tickers:
+                cols = [col for col in data.columns if ticker in col]
+                data[cols].to_csv(path + '/' + ticker + '.csv')
+
     @staticmethod
-    def __validate_tickers(tickers):
+    @beartype
+    def __validate_tickers(tickers: (list, str)):
         if isinstance(tickers, list):
             return tickers
         return tickers.split(' ')
 
     @staticmethod
-    def __flatten_index(df):
+    @beartype
+    def __flatten_index(df: pd.DataFrame):
         data = df.copy()
         data.columns = [' '.join(col).strip() for col in data.columns]
         return data
+
+    @beartype
+    def __check_tickers_type(self, tickers: (list, str, NoneType)):
+        if tickers is None:
+            return self.__tickers
+        elif isinstance(tickers, str):
+            return [tickers]
+        else:
+            return tickers
+

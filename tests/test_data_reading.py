@@ -2,7 +2,7 @@ import unittest
 import pandas as pd
 
 from vcov_forecast.modules.data_handling.data_reading import YahooDataReader
-from vcov_forecast.modules.data_handling.data_reading import YahooMultipleTickersReader
+from vcov_forecast.modules.data_handling.data_reading import YahooReader
 
 
 class TestYahooDataReader(unittest.TestCase):
@@ -50,18 +50,18 @@ class TestYahooDataReader(unittest.TestCase):
         self.assertEqual(data.name, "Volume")
 
 
-class TestYahooMultipleTickersReader(unittest.TestCase):
+class TestYahooReader(unittest.TestCase):
 
     def setUp(self) -> None:
-        self.yreader = YahooMultipleTickersReader('AAPL NFLX', start="2021-01-04", end="2021-01-14")
+        self.yreader = YahooReader('AAPL NFLX', start="2021-01-04", end="2021-01-14")
 
     def test_get_data(self):
         data = self.yreader.get_data()
         self.assertIsInstance(data, pd.DataFrame)
         self.assertEqual(len(data), 8)
 
-    def test_get_tickers(self):
-        tickers = self.yreader.get_tickers()
+    def test_get_all_tickers(self):
+        tickers = self.yreader.get_all_tickers()
         self.assertEqual(len(tickers), 2)
         for tick in tickers:
             self.assertIn(tick, ['AAPL', 'NFLX'])
@@ -72,3 +72,13 @@ class TestYahooMultipleTickersReader(unittest.TestCase):
         self.assertEqual(list(data.columns[0])[0], 'Open')
         data = self.yreader.get_columns('Open', single_index=True)
         self.assertEqual(data.columns[0].split(' ')[0], 'Open')
+
+    def test_get_data_by_tickers(self):
+        data = self.yreader.get_data_by_tickers('NFLX', single_index=True)
+        self.assertEqual(len(data.columns), 6)
+        self.assertEqual(data.columns[0].split(' ')[-1], 'NFLX')
+
+    '''def test_save(self):
+        self.yreader.save(path='../data', single_index=True, single_file=False)'''
+    # I checked properties of save method manually and commented these lines to protect any data from being accidentally
+    # overwritten due to execution of this method

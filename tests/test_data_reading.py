@@ -41,7 +41,7 @@ class TestYahooDataReader(unittest.TestCase):
 
     def test_get_adj_close(self):
         data = self.yreader.get_adj_close()
-        self.assertEqual(round(data[0], 3), 129.41)
+        self.assertEqual(round(data[0], 3), 129.217)
         self.assertEqual(data.name, "Adj Close")
 
     def test_get_volume(self):

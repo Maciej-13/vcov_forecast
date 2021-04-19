@@ -96,7 +96,7 @@ class YahooReader:
         tickers = self.__check_tickers_type(tickers)
 
         if single_file:
-            data.to_csv(path)
+            data.to_csv(path + '/data.csv')
 
         elif not single_index:
             for ticker in tickers:

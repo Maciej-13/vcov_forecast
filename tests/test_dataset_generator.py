@@ -39,6 +39,7 @@ class TestCovarianceHandler(unittest.TestCase):
         self.data = InputHandler('../data/data_short.csv', assets=['AAPL', 'BAC', 'MSFT', 'GOOG'], column='Close',
                                  returns=True).get_data()
         self.data_idx = self.data.reset_index(drop=True)
+        self.rolling_cov = self.cov.calculate_rolling_covariance_matrix(self.data)
 
     def test_calculate_rolling_covariance_matrix(self):
         covariances = self.cov.calculate_rolling_covariance_matrix(self.data)
@@ -49,17 +50,24 @@ class TestCovarianceHandler(unittest.TestCase):
 
     def test_split_covariance_matrices(self):
         dates = self.data.index[14:]
-        cov_by_dt = self.cov.split_covariance_matrices(self.cov.calculate_rolling_covariance_matrix(self.data))
+        cov_by_dt = self.cov.split_covariance_matrices(self.rolling_cov)
         for i in range(14, len(self.data)):
             temp_data = self.data_idx.loc[i - 14:i]
             np.testing.assert_array_almost_equal(np.cov(temp_data.to_numpy().T)[np.tril_indices(4)],
                                                  cov_by_dt[dates[i-14]], decimal=10)
 
     def test_split_covariance_to_long(self):
-        long_cov = self.cov.split_covariance_to_long(self.cov.calculate_rolling_covariance_matrix(self.data))
+        long_cov = self.cov.split_covariance_to_long(self.rolling_cov)
         for i in range(14, len(self.data)):
             cov = np.cov(self.data_idx.loc[i - 14:i].to_numpy().T)[np.tril_indices(4)].ravel()
             np.testing.assert_array_almost_equal(cov, long_cov.loc[self.data.index[i]].to_numpy())
+
+    def test_get_covariance_vector(self):
+        vector = self.cov.get_covariance_vector(self.rolling_cov, 'AAPL_BAC')
+        filtered_data = self.data_idx.loc[:, ['AAPL', 'BAC']]
+        for i in range(14, len(self.data)):
+            cov = np.cov(filtered_data.loc[i - 14:i].to_numpy().T)[0][1].ravel()
+            np.testing.assert_array_almost_equal(cov, vector.loc[self.data.index[i]])
 
     def test_get_names(self):
         tickers = ['AMZN', 'AAPL', 'MSFT', 'GOOG', 'AEE', 'ANSS',

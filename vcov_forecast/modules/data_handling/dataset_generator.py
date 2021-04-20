@@ -55,6 +55,19 @@ class CovarianceHandler:
             data.loc[dt] = rolling_mtx.xs(dt, level=0).to_numpy()[idx]
         return data
 
+    def get_covariance_vector(self, rolling_mtx, name):
+        cov_names = self.get_names(rolling_mtx.columns.to_list())
+        if name not in cov_names:
+            reversed_name = '_'.join((name.split('_')[1], name.split('_')[0]))
+            if reversed_name in cov_names:
+                name = reversed_name
+            else:
+                raise ValueError(f'{name} if not a valid pair of tickers! Available pairs are {cov_names}')
+        row, col = name.split('_')
+        filtered_df = rolling_mtx.copy()
+        filtered_df = filtered_df.xs(row, level=1)[col]
+        return filtered_df
+
     @staticmethod
     def get_names(ticker_list):
         first, second = np.tril_indices(len(ticker_list))

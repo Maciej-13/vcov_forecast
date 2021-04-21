@@ -1,6 +1,8 @@
 import pandas as pd
 import numpy as np
 
+from collections import OrderedDict
+
 
 class InputHandler:
 
@@ -35,6 +37,7 @@ class CovarianceHandler:
     def __init__(self, lookback, n_assets):
         self.lookback = lookback
         self.__assets = n_assets
+        self.__idx = np.tril_indices(self.__assets)
 
     def calculate_rolling_covariance_matrix(self, data):
         data = data.rolling(self.lookback).cov()
@@ -42,17 +45,15 @@ class CovarianceHandler:
         return data
 
     def split_covariance_matrices(self, rolling_mtx):
-        idx = np.tril_indices(self.__assets)
-        cov_by_date = {dt: np.array(rolling_mtx.xs(dt, level=0))[idx] for dt in
-                       rolling_mtx.index.get_level_values(0)}
+        cov_by_date = {dt: np.array(rolling_mtx.xs(dt, level=0))[self.__idx] for dt in
+                       rolling_mtx.index.get_level_values(0).unique()}
         return cov_by_date
 
-    def split_covariance_to_long(self, rolling_mtx):
+    def split_covariance_to_wide(self, rolling_mtx):
         dates = rolling_mtx.index.get_level_values(0).unique()
         data = pd.DataFrame(columns=self.get_names(rolling_mtx.columns.tolist()), index=dates)
-        idx = np.tril_indices(self.__assets)
         for dt in dates:
-            data.loc[dt] = rolling_mtx.xs(dt, level=0).to_numpy()[idx]
+            data.loc[dt] = rolling_mtx.xs(dt, level=0).to_numpy()[self.__idx]
         return data
 
     def get_covariance_vector(self, rolling_mtx, name):
@@ -68,7 +69,46 @@ class CovarianceHandler:
         filtered_df = filtered_df.xs(row, level=1)[col]
         return filtered_df
 
+    def cholesky_transformation(self, rolling_mtx, return_dict=False):
+        if return_dict:
+            return {dt: np.linalg.cholesky(rolling_mtx.xs(dt, level=0).to_numpy()) for dt in
+                    rolling_mtx.index.get_level_values(0)}
+        else:
+            dates = rolling_mtx.index.get_level_values(0).unique()
+            data = pd.DataFrame(columns=self.get_names(rolling_mtx.columns.tolist()),
+                                index=dates)
+            for dt in dates:
+                data.loc[dt] = np.linalg.cholesky(rolling_mtx.xs(dt, level=0).to_numpy())[self.__idx]
+            return data
+
+    def reverse_cholesky_transformation(self, cholesky):
+        if isinstance(cholesky, dict):
+            return {dt: self.__reverse_cholesky(matrix) for dt, matrix in cholesky.items()}
+
+        elif isinstance(cholesky, pd.DataFrame):
+            assets = self.split_names(cholesky.columns.tolist())
+            arrays = [np.repeat(cholesky.index.tolist(), len(assets)), assets * len(cholesky.index)]
+            tuples = list(zip(*arrays))
+            m_index = pd.MultiIndex.from_tuples(tuples, names=['Date', 'Asset'])
+            data = pd.DataFrame(columns=assets, index=m_index)
+            for dt in cholesky.index:
+                temp_matrix = np.zeros((self.__assets, self.__assets)).astype(float)
+                temp_matrix[self.__idx] = cholesky.loc[dt, :].values
+                data.loc[(dt, slice(None)), :] = self.__reverse_cholesky(temp_matrix)
+            return data.astype(float)
+
+        else:
+            raise TypeError(f'Object of type {type(cholesky)} is not supported! Pass a dictionary or a data frame!')
+
     @staticmethod
     def get_names(ticker_list):
         first, second = np.tril_indices(len(ticker_list))
         return ['_'.join((ticker_list[i], ticker_list[j])) for i, j in zip(first, second)]
+
+    @staticmethod
+    def split_names(joined_names):
+        return list(OrderedDict.fromkeys([name.split('_')[0] for name in joined_names]))
+
+    @staticmethod
+    def __reverse_cholesky(matrix):
+        return np.dot(matrix, matrix.T.conj())

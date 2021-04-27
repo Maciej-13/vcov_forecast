@@ -2,11 +2,16 @@ import pandas as pd
 import numpy as np
 
 from collections import OrderedDict
+from sklearn.model_selection import train_test_split
+from keras.preprocessing.sequence import TimeseriesGenerator
+from beartype import beartype
+from beartype.cave import NoneType
 
 
 class InputHandler:
 
-    def __init__(self, path, assets, column='Close', returns=True):
+    @beartype
+    def __init__(self, path: str, assets: list, column: str = 'Close', returns: bool = True):
         self.__path = path
         self.assets = assets
         self.__column = column
@@ -17,6 +22,9 @@ class InputHandler:
 
     def get_data(self):
         return self.__data
+
+    def train_test_split(self, test_size: float = 0.2):
+        return train_test_split(self.__data, test_size=test_size, shuffle=False, random_state=42)
 
     def __load_data(self):
         self.__data = pd.read_csv(self.__path, parse_dates=['Date'], index_col='Date')
@@ -34,29 +42,34 @@ class InputHandler:
 
 class CovarianceHandler:
 
-    def __init__(self, lookback, n_assets):
+    @beartype
+    def __init__(self, lookback: int, n_assets: int):
         self.lookback = lookback
         self.__assets = n_assets
         self.__idx = np.tril_indices(self.__assets)
 
-    def calculate_rolling_covariance_matrix(self, data):
+    @beartype
+    def calculate_rolling_covariance_matrix(self, data: pd.DataFrame):
         data = data.rolling(self.lookback).cov()
         data.dropna(inplace=True)
         return data
 
-    def split_covariance_matrices(self, rolling_mtx):
+    @beartype
+    def split_covariance_matrices(self, rolling_mtx: pd.DataFrame):
         cov_by_date = {dt: np.array(rolling_mtx.xs(dt, level=0))[self.__idx] for dt in
                        rolling_mtx.index.get_level_values(0).unique()}
         return cov_by_date
 
-    def split_covariance_to_wide(self, rolling_mtx):
+    @beartype
+    def split_covariance_to_wide(self, rolling_mtx: pd.DataFrame):
         dates = rolling_mtx.index.get_level_values(0).unique()
         data = pd.DataFrame(columns=self.get_names(rolling_mtx.columns.tolist()), index=dates)
         for dt in dates:
             data.loc[dt] = rolling_mtx.xs(dt, level=0).to_numpy()[self.__idx]
         return data
 
-    def get_covariance_vector(self, rolling_mtx, name):
+    @beartype
+    def get_covariance_vector(self, rolling_mtx: pd.DataFrame, name: str):
         cov_names = self.get_names(rolling_mtx.columns.to_list())
         if name not in cov_names:
             reversed_name = '_'.join((name.split('_')[1], name.split('_')[0]))
@@ -69,7 +82,8 @@ class CovarianceHandler:
         filtered_df = filtered_df.xs(row, level=1)[col]
         return filtered_df
 
-    def cholesky_transformation(self, rolling_mtx, return_dict=False):
+    @beartype
+    def cholesky_transformation(self, rolling_mtx: pd.DataFrame, return_dict: bool = False):
         if return_dict:
             return {dt: np.linalg.cholesky(rolling_mtx.xs(dt, level=0).to_numpy()) for dt in
                     rolling_mtx.index.get_level_values(0)}
@@ -81,7 +95,8 @@ class CovarianceHandler:
                 data.loc[dt] = np.linalg.cholesky(rolling_mtx.xs(dt, level=0).to_numpy())[self.__idx]
             return data
 
-    def reverse_cholesky_transformation(self, cholesky):
+    @beartype
+    def reverse_cholesky_transformation(self, cholesky: (dict, pd.DataFrame)):
         if isinstance(cholesky, dict):
             return {dt: self.__reverse_cholesky(matrix) for dt, matrix in cholesky.items()}
 
@@ -101,14 +116,53 @@ class CovarianceHandler:
             raise TypeError(f'Object of type {type(cholesky)} is not supported! Pass a dictionary or a data frame!')
 
     @staticmethod
-    def get_names(ticker_list):
+    @beartype
+    def get_names(ticker_list: list):
         first, second = np.tril_indices(len(ticker_list))
         return ['_'.join((ticker_list[i], ticker_list[j])) for i, j in zip(first, second)]
 
     @staticmethod
-    def split_names(joined_names):
+    @beartype
+    def split_names(joined_names: list):
         return list(OrderedDict.fromkeys([name.split('_')[0] for name in joined_names]))
 
     @staticmethod
     def __reverse_cholesky(matrix):
         return np.dot(matrix, matrix.T.conj())
+
+
+class KerasDataset:
+
+    @beartype
+    def __init__(self, data: (pd.DataFrame, pd.Series), forward_shift: (int, NoneType) = None, **kwargs):
+        self.__data = data
+        self.__shift = forward_shift if forward_shift is None else forward_shift - 1 if forward_shift > 1 else 0
+        self.__generator = None
+        self.__create_generator(**kwargs)
+
+    def get_generator(self):
+        return self.__generator
+
+    def __create_generator(self, **kwargs):
+        if self.__shift is None:
+            data = self.__prepare_arrays()
+            self.__generator = TimeseriesGenerator(data, data, **kwargs)
+
+        else:
+            data = self.__prepare_arrays()
+            data, targets = self.__shift_array(data)
+            self.__generator = TimeseriesGenerator(data, targets, **kwargs)
+
+    def __prepare_arrays(self):
+        if isinstance(self.__data, pd.Series):
+            return np.array(self.__data).reshape((len(self.__data), 1))
+
+        else:
+            arrays = tuple(np.array(self.__data[i]).reshape((len(self.__data), 1)) for i in self.__data.columns)
+            matrix = np.hstack(arrays)
+            return matrix
+
+    def __shift_array(self, array):
+        target = array[self.__shift:]
+        values = array[:(len(array) - self.__shift)]
+        return values, target

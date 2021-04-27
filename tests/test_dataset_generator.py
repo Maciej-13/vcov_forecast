@@ -4,6 +4,7 @@ import numpy as np
 import pandas as pd
 
 from scipy import linalg
+from keras.preprocessing.sequence import TimeseriesGenerator
 
 from vcov_forecast.modules.data_handling.dataset_generator import *
 
@@ -24,6 +25,18 @@ class TestInputHandler(unittest.TestCase):
         self.assertEqual(len(self.handler.get_data().columns), 4)
         self.assertCountEqual(self.handler.get_data().columns.tolist(), self.tickers)
         self.assertIsInstance(self.handler.get_data().index, pd.DatetimeIndex)
+
+    def test_train_test_split(self):
+        train_data, test_data = self.handler.train_test_split(test_size=0.2)
+        pd.testing.assert_frame_equal(self.temp_data.head(int(len(self.temp_data) * 0.8)), train_data)
+        np.testing.assert_array_almost_equal(self.temp_data.head(int(len(self.temp_data) * 0.8)).values,
+                                             train_data.values)
+        pd.testing.assert_frame_equal(
+            self.temp_data.loc[~self.temp_data.index.isin(self.temp_data.head(int(len(self.temp_data) * 0.8)).index)],
+            test_data)
+        np.testing.assert_array_almost_equal(self.temp_data.loc[~self.temp_data.index.isin(
+            self.temp_data.head(int(len(self.temp_data) * 0.8)).index)].values,
+                                             test_data.values)
 
     def test_select_column(self):
         pd.testing.assert_frame_equal(self.temp_data, self.handler.get_data())
@@ -127,3 +140,86 @@ class TestCovarianceHandler(unittest.TestCase):
         assets = ['AAPL', 'BAC', 'MSFT', 'GOOG']
         names_assets = self.cov.get_names(assets)
         self.assertListEqual(assets, self.cov.split_names(names_assets))
+
+
+class TestKerasDataset(unittest.TestCase):
+
+    def setUp(self) -> None:
+        data = InputHandler('../data/data_short.csv', assets=['AAPL', 'BAC', 'MSFT', 'GOOG'], column='Close',
+                            returns=True).get_data()
+        cov = CovarianceHandler(lookback=15, n_assets=4)
+
+        self.cov_data = cov.split_covariance_to_wide(cov.calculate_rolling_covariance_matrix(data))
+        self.dates = self.cov_data.index
+
+    def test_get_generator(self):
+        generator = KerasDataset(self.cov_data, forward_shift=None, length=1, batch_size=1).get_generator()
+        self.assertIsInstance(generator, TimeseriesGenerator)
+        for i, batch in enumerate(generator):
+            inputs, target = batch
+            np.testing.assert_array_almost_equal(inputs.ravel(), self.cov_data.iloc[i].to_numpy(), decimal=16)
+            np.testing.assert_array_almost_equal(target.ravel(), self.cov_data.iloc[i + 1].to_numpy(), decimal=16)
+
+    def test_get_generator_length(self):
+        generator = KerasDataset(self.cov_data, forward_shift=None, length=5, batch_size=1).get_generator()
+        for i, batch in enumerate(generator):
+            inputs, target = batch
+            np.testing.assert_array_almost_equal(inputs.reshape((5, 10)), self.cov_data.iloc[i:(i + 5)].to_numpy(),
+                                                 decimal=16)
+            np.testing.assert_array_almost_equal(target.ravel(), self.cov_data.iloc[i + 5].to_numpy(), decimal=16)
+
+    def test_get_generator_batch_size(self):
+        generator = KerasDataset(self.cov_data, forward_shift=None, length=1, batch_size=2).get_generator()
+        for i, batch in enumerate(generator):
+            inputs, target = batch
+            i *= 2
+            np.testing.assert_array_almost_equal(inputs[0].ravel(), self.cov_data.iloc[i].to_numpy(), decimal=16)
+            np.testing.assert_array_almost_equal(target[0].ravel(), self.cov_data.iloc[i + 1].to_numpy(), decimal=16)
+
+            np.testing.assert_array_almost_equal(inputs[1].ravel(), self.cov_data.iloc[i + 1].to_numpy(), decimal=16)
+            np.testing.assert_array_almost_equal(target[1].ravel(), self.cov_data.iloc[i + 2].to_numpy(), decimal=16)
+
+    def test_shift_array(self):
+        generator = KerasDataset(self.cov_data, forward_shift=10, length=1, batch_size=1).get_generator()
+        self.assertIsInstance(generator, TimeseriesGenerator)
+        for i, batch in enumerate(generator):
+            inputs, target = batch
+            np.testing.assert_array_almost_equal(inputs.ravel(), self.cov_data.iloc[i].to_numpy(), decimal=16)
+            np.testing.assert_array_almost_equal(target.ravel(), self.cov_data.iloc[i + 10].to_numpy(), decimal=16)
+
+    def test_shift_array_length(self):
+        generator = KerasDataset(self.cov_data, forward_shift=10, length=5, batch_size=1).get_generator()
+        for i, batch in enumerate(generator):
+            inputs, target = batch
+            np.testing.assert_array_almost_equal(inputs.reshape((5, 10)), self.cov_data.iloc[i:(i + 5)].to_numpy(),
+                                                 decimal=16)
+            np.testing.assert_array_almost_equal(target.ravel(), self.cov_data.iloc[i + 4 + 10].to_numpy(), decimal=16)
+
+    def test_shift_array_batch_size(self):
+        generator = KerasDataset(self.cov_data, forward_shift=10, length=1, batch_size=2).get_generator()
+        for i, batch in enumerate(generator):
+            '''here an additional if statement is required as there are no enough observations to divide such dataset
+            into equal batches of two, hence Keras makes the last batch smaller (1 array of 5 observations) instead
+            of two arrays'''
+            if i < len(generator) - 1:
+                inputs, target = batch
+                i *= 2
+                np.testing.assert_array_almost_equal(inputs[0].ravel(), self.cov_data.iloc[i].to_numpy(), decimal=16)
+                np.testing.assert_array_almost_equal(target[0].ravel(), self.cov_data.iloc[i + 10].to_numpy(),
+                                                     decimal=16)
+
+                np.testing.assert_array_almost_equal(inputs[1].ravel(), self.cov_data.iloc[i + 1].to_numpy(),
+                                                     decimal=16)
+                np.testing.assert_array_almost_equal(target[1].ravel(), self.cov_data.iloc[i + 11].to_numpy(),
+                                                     decimal=16)
+
+    def test_get_generator_series(self):
+        series = self.cov_data['AAPL_AAPL']
+        generator = KerasDataset(series, length=3, batch_size=2).get_generator()
+        for i, batch in enumerate(generator):
+            inputs, target = batch
+            i *= 2
+            np.testing.assert_array_almost_equal(inputs[0].ravel(), series.iloc[i:(i + 3)])
+            np.testing.assert_array_almost_equal(target[0], series.iloc[i + 3])
+            np.testing.assert_array_almost_equal(inputs[1].ravel(), series.iloc[(i + 1):(i + 1 + 3)])
+            np.testing.assert_array_almost_equal(target[1], series.iloc[i + 4])

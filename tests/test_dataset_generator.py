@@ -150,6 +150,7 @@ class TestKerasDataset(unittest.TestCase):
         cov = CovarianceHandler(lookback=15, n_assets=4)
 
         self.cov_data = cov.split_covariance_to_wide(cov.calculate_rolling_covariance_matrix(data))
+        self.chol_data = cov.cholesky_transformation(cov.calculate_rolling_covariance_matrix(data))
         self.dates = self.cov_data.index
 
     def test_get_generator(self):
@@ -223,3 +224,47 @@ class TestKerasDataset(unittest.TestCase):
             np.testing.assert_array_almost_equal(target[0], series.iloc[i + 3])
             np.testing.assert_array_almost_equal(inputs[1].ravel(), series.iloc[(i + 1):(i + 1 + 3)])
             np.testing.assert_array_almost_equal(target[1], series.iloc[i + 4])
+
+    def test_get_prepared_generator(self):
+        with self.assertRaises(ValueError):
+            get_prepared_generator('../data/data_short.csv', assets=['AAPL', 'BAC', 'MSFT', 'GOOG'], lookback=15,
+                                   length=1, val_size=2)
+
+    def test_get_prepared_generator_no_split(self):
+        gen = get_prepared_generator('../data/data_short.csv', assets=['AAPL', 'BAC', 'MSFT', 'GOOG'], lookback=15,
+                                     length=1, val_size=0)
+        self.assertIsInstance(gen, TimeseriesGenerator)
+        self.assertEqual(gen.batch_size, 128)
+        self.assertEqual(gen.length, 1)
+
+    def test_get_prepared_generator_batch(self):
+        gen = get_prepared_generator('../data/data_short.csv', assets=['AAPL', 'BAC', 'MSFT', 'GOOG'], lookback=15,
+                                     length=1, val_size=0, batch_size=1)
+        self.assertIsInstance(gen, TimeseriesGenerator)
+        self.assertEqual(gen.batch_size, 1)
+        for i, batch in enumerate(gen):
+            inputs, target = batch
+            np.testing.assert_array_almost_equal(inputs.reshape((10,)), self.chol_data.iloc[i].to_numpy(),
+                                                 decimal=16)
+            np.testing.assert_array_almost_equal(target.ravel(), self.chol_data.iloc[i + 1].to_numpy(), decimal=16)
+
+    def test_get_prepared_generator_split(self):
+        train_gen, val_gen = get_prepared_generator('../data/data_short.csv', assets=['AAPL', 'BAC', 'MSFT', 'GOOG'],
+                                                    lookback=15, length=1, val_size=0.2, batch_size=1)
+        self.assertIsInstance(train_gen, TimeseriesGenerator)
+        self.assertIsInstance(val_gen, TimeseriesGenerator)
+        train_data, val_data = InputHandler('../data/data_short.csv', assets=['AAPL', 'BAC', 'MSFT', 'GOOG'],
+                                            column='Close', returns=True).train_test_split(0.2)
+        cov = CovarianceHandler(lookback=15, n_assets=4)
+        train_data = cov.cholesky_transformation(cov.calculate_rolling_covariance_matrix(train_data))
+        val_data = cov.cholesky_transformation(cov.calculate_rolling_covariance_matrix(val_data))
+
+        for i, batch in enumerate(train_gen):
+            inputs, target = batch
+            np.testing.assert_array_almost_equal(inputs.reshape((10,)), train_data.iloc[i].to_numpy())
+            np.testing.assert_array_almost_equal(target.ravel(), train_data.iloc[i + 1].to_numpy())
+
+        for i, batch in enumerate(val_gen):
+            inputs, target = batch
+            np.testing.assert_array_almost_equal(inputs.reshape((10,)), val_data.iloc[i].to_numpy())
+            np.testing.assert_array_almost_equal(target.ravel(), val_data.iloc[i + 1].to_numpy())

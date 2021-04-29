@@ -134,9 +134,10 @@ class CovarianceHandler:
 class KerasDataset:
 
     @beartype
-    def __init__(self, data: (pd.DataFrame, pd.Series), forward_shift: (int, NoneType) = None, **kwargs):
+    def __init__(self, data: (pd.DataFrame, pd.Series), length: int, forward_shift: (int, NoneType) = None, **kwargs):
         self.__data = data
         self.__shift = forward_shift if forward_shift is None else forward_shift - 1 if forward_shift > 1 else 0
+        self.__length = length
         self.__generator = None
         self.__create_generator(**kwargs)
 
@@ -146,12 +147,12 @@ class KerasDataset:
     def __create_generator(self, **kwargs):
         if self.__shift is None:
             data = self.__prepare_arrays()
-            self.__generator = TimeseriesGenerator(data, data, **kwargs)
+            self.__generator = TimeseriesGenerator(data, data, length=self.__length, **kwargs)
 
         else:
             data = self.__prepare_arrays()
             data, targets = self.__shift_array(data)
-            self.__generator = TimeseriesGenerator(data, targets, **kwargs)
+            self.__generator = TimeseriesGenerator(data, targets, length=self.__length, **kwargs)
 
     def __prepare_arrays(self):
         if isinstance(self.__data, pd.Series):
@@ -166,3 +167,26 @@ class KerasDataset:
         target = array[self.__shift:]
         values = array[:(len(array) - self.__shift)]
         return values, target
+
+
+@beartype
+def get_prepared_generator(path: str, assets: list, lookback: int, length: int, forward_shift: (int, NoneType) = None,
+                           val_size: (float, int) = 0.2, **kwargs):
+    if 0 < val_size < 1:
+        train, val = InputHandler(path, assets).train_test_split(val_size)
+        cov_handler = CovarianceHandler(lookback, n_assets=len(assets))
+        train_cholesky = cov_handler.cholesky_transformation(cov_handler.calculate_rolling_covariance_matrix(train))
+        val_cholesky = cov_handler.cholesky_transformation(cov_handler.calculate_rolling_covariance_matrix(val))
+        train_gen = KerasDataset(train_cholesky, length=length, forward_shift=forward_shift, **kwargs).get_generator()
+        val_gen = KerasDataset(val_cholesky, length=length, forward_shift=forward_shift, **kwargs).get_generator()
+        return train_gen, val_gen
+
+    elif val_size == 0:
+        data = InputHandler(path, assets).get_data()
+        cov_handler = CovarianceHandler(lookback, n_assets=len(assets))
+        cholesky_data = cov_handler.cholesky_transformation(cov_handler.calculate_rolling_covariance_matrix(data))
+        gen = KerasDataset(cholesky_data, length=length, forward_shift=forward_shift, **kwargs).get_generator()
+        return gen
+
+    else:
+        raise (ValueError("Parameter val_size must be greater of equal to zero and not higher than 1!"))

@@ -30,27 +30,11 @@ class LSTM:
     def compile_model(self, loss, optimizer, metrics: list, **kwargs):
         self.__model.compile(optimizer=optimizer, loss=loss, metrics=metrics, **kwargs)
 
-    @beartype
-    def train(self, training_data, epochs: int, **kwargs):
-        return self.__model.fit(training_data, epochs=epochs, batch_size=self.__batch_size, **kwargs)
-
-    def evaluate(self, data):
-        return self.__model.evaluate(data)
-
-    def predict(self, data):
-        return self.__model.predict(data)
-
-    def save(self, *args, **kwargs):
-        self.__model.save(*args, **kwargs)
-
     def get_model(self):
         return self.__model
 
     def get_summary(self):
         return self.__model.summary()
-
-    def multistep_ahead_forecast(self):
-        pass
 
     def __create_model(self):
         inputs = layers.Input(shape=self.__shape)

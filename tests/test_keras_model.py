@@ -27,9 +27,6 @@ class TestLSTM(unittest.TestCase):
         self.assertTrue(model._is_compiled)
         self.assertIsInstance(model.optimizer, tf.keras.optimizers.Adam)
 
-    def test_multistep_ahead_forecast(self):
-        pass
-
     def test_get_model(self):
         model = self.lstm.get_model()
         self.assertIsInstance(model, keras.Model)

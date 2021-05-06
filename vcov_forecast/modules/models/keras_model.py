@@ -1,5 +1,6 @@
 from tensorflow import keras
 from tensorflow.keras import layers
+from tcn import TCN, tcn_full_summary
 
 from beartype import beartype
 from beartype.cave import NoneType
@@ -8,7 +9,7 @@ from beartype.cave import NoneType
 class LSTM:
 
     @beartype
-    def __init__(self, shape: tuple, architecture: list, batch_size: int, dropout_rate: float,
+    def __init__(self, shape: tuple, architecture: list, dropout_rate: float, batch_size: (int, NoneType) = None,
                  bidirectional: bool = False, merge_mode: (str, NoneType) = None, convolutional_layer: bool = False,
                  kernel_size: (int, NoneType) = None, padding: (str, NoneType) = None, filters: (int, NoneType) = None,
                  pool_size: (int, NoneType) = None):
@@ -31,7 +32,7 @@ class LSTM:
 
     @beartype
     def train(self, training_data, epochs: int, **kwargs):
-        return self.__model.fit(training_data, epochs=epochs, **kwargs)
+        return self.__model.fit(training_data, epochs=epochs, batch_size=self.__batch_size, **kwargs)
 
     def evaluate(self, data):
         return self.__model.evaluate(data)
@@ -42,14 +43,14 @@ class LSTM:
     def save(self, *args, **kwargs):
         self.__model.save(*args, **kwargs)
 
-    def multistep_ahead_forecast(self):
-        pass
-
     def get_model(self):
         return self.__model
 
     def get_summary(self):
         return self.__model.summary()
+
+    def multistep_ahead_forecast(self):
+        pass
 
     def __create_model(self):
         inputs = layers.Input(shape=self.__shape)

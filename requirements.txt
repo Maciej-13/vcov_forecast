@@ -1,6 +1,6 @@
-beartype==0.5.1
-numpy==1.18.5
-pandas==1.2.0
+beartype==0.6.0
+numpy~=1.16.6
+pandas~=1.2.3
 
 yfinance~=0.1.55
 scipy~=1.4.1
@@ -8,3 +8,6 @@ scikit-learn~=0.24.1
 keras~=2.4.3
 sklearn~=0.0
 tensorflow-gpu~=2.2.0
+matplotlib~=3.4.1
+mxnet~=1.7.0.post2
+gluonts~=0.7.6

@@ -64,3 +64,32 @@ class LSTM:
             return layers.Bidirectional(layers.LSTM(units, **kwargs), merge_mode=self.__merge)
         else:
             return layers.LSTM(units, **kwargs)
+
+
+class KerasTCN:
+
+    @beartype
+    def __init__(self, shape: tuple, nb_filters: int, kernel_size: int, nb_stacks: int, dilations: tuple, padding: str,
+                 dropout: float, **kwargs):
+        self.__model = self.__create_model(shape=shape, nb_filters=nb_filters, kernel_size=kernel_size,
+                                           nb_stacks=nb_stacks, dilations=dilations, padding=padding,
+                                           dropout=dropout, **kwargs)
+
+    @beartype
+    def compile_model(self, loss, optimizer, metrics: list, **kwargs):
+        self.__model.compile(optimizer=optimizer, loss=loss, metrics=metrics, **kwargs)
+
+    def get_model(self):
+        return self.__model
+
+    def get_summary(self, expand_residual_blocks: bool = True):
+        return tcn_full_summary(self.__model, expand_residual_blocks=expand_residual_blocks)
+
+    @staticmethod
+    def __create_model(shape: tuple, nb_filters: int, kernel_size: int, nb_stacks: int, dilations: tuple, padding: str,
+                       dropout: float, **kwargs):
+        tcn = TCN(input_shape=shape, nb_filters=nb_filters, kernel_size=kernel_size, nb_stacks=nb_stacks,
+                  dilations=dilations, padding=padding, dropout_rate=dropout, **kwargs)
+        outputs = layers.Dense(shape[-1])
+        final_model = keras.Sequential([tcn, outputs])
+        return final_model

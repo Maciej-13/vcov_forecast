@@ -110,7 +110,7 @@ class CovarianceHandler:
                 temp_matrix = np.zeros((self.__assets, self.__assets)).astype(float)
                 temp_matrix[self.__idx] = cholesky.loc[dt, :].values
                 data.loc[(dt, slice(None)), :] = self.__reverse_cholesky(temp_matrix)
-            return data.astype(float)
+            return data.astype(np.float32)
 
         else:
             raise TypeError(f'Object of type {type(cholesky)} is not supported! Pass a dictionary or a data frame!')
@@ -156,17 +156,17 @@ class KerasDataset:
 
     def __prepare_arrays(self):
         if isinstance(self.__data, pd.Series):
-            return np.array(self.__data).reshape((len(self.__data), 1))
+            return np.array(self.__data).astype(np.float32).reshape((len(self.__data), 1))
 
         else:
             arrays = tuple(np.array(self.__data[i]).reshape((len(self.__data), 1)) for i in self.__data.columns)
-            matrix = np.hstack(arrays)
+            matrix = np.hstack(arrays).astype(np.float32)
             return matrix
 
     def __shift_array(self, array):
         target = array[self.__shift:]
         values = array[:(len(array) - self.__shift)]
-        return values, target
+        return values.astype(np.float32), target.astype(np.float32)
 
 
 @beartype

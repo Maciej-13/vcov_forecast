@@ -26,6 +26,12 @@ def returns(data_dir):
 
 
 @pytest.fixture()
+def single_prices(data_dir):
+    return InputHandler(data_dir + '/data_short.csv',
+                        assets=['AAPL', 'BAC', 'MSFT', 'GOOG'], returns=False).get_data()["AAPL"]
+
+
+@pytest.fixture()
 def returns_no_idx(returns):
     data = returns.reset_index(drop=True)
     return data

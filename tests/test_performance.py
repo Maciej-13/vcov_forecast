@@ -105,3 +105,10 @@ def test_get_performance_statistics(single_prices):
     assert 'IR3' in stats
     assert isinstance(stats['aRC'], float)
     assert stats['IR3'] == (arc ** 3) / (asd * md * mld)
+
+
+def test_cumulative_returns(single_prices):
+    cum_ret = PerformanceStatistics.cumulative_returns(single_prices)
+    assert isinstance(cum_ret, pd.Series)
+    assert all(
+        i == j for i, j in zip(cum_ret.dropna(), (np.cumprod(single_prices / single_prices.shift(1)) - 1).dropna()))

@@ -21,6 +21,11 @@ def data_path(data_dir):
 
 
 @pytest.fixture()
+def prices(data_path):
+    return InputHandler(data_path, assets=['AAPL', 'F'], returns=False).get_data()
+
+
+@pytest.fixture()
 def returns(data_dir):
     return InputHandler(data_dir + '/data_short.csv', assets=['AAPL', 'BAC', 'MSFT', 'GOOG'], returns=True).get_data()
 

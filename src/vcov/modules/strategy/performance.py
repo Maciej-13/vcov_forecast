@@ -56,5 +56,10 @@ class PerformanceStatistics:
         return mld
 
     @staticmethod
+    def cumulative_returns(prices: Series) -> Series:
+        returns: Series = prices.pct_change()
+        return (returns + 1).cumprod() - 1
+
+    @staticmethod
     def _calculate_r(prices: Series) -> Series:
         return prices / prices.shift(1)

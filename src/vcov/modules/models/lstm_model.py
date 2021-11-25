@@ -70,8 +70,7 @@ class LSTM:
 class KerasTCN:
 
     def __init__(self, shape: Tuple[int, ...], nb_filters: int, kernel_size: int, nb_stacks: int,
-                 dilations: Tuple[int, ...],
-                 padding: str, dropout: float, **kwargs) -> None:
+                 dilations: Tuple[int, ...], padding: str, dropout: float, **kwargs) -> None:
         self._model = self._create_model(shape=shape, nb_filters=nb_filters, kernel_size=kernel_size,
                                          nb_stacks=nb_stacks, dilations=dilations, padding=padding,
                                          dropout=dropout, **kwargs)

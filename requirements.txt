@@ -18,6 +18,6 @@ setuptools==58.0.4
 tensorflow-estimator==2.2.0
 tensorflow==2.2.0
 typing-extensions~=3.10.0.2
-yfinance~=0.1.64
-tqdm~=4.60.0
-gluonts~=0.7.7
+yfinance~=0.1.63
+tqdm~=4.62.0
+gluonts~=0.8.1

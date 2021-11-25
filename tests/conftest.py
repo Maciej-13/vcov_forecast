@@ -3,6 +3,7 @@ import os
 
 from vcov.modules.data_handling.input_handler import InputHandler
 from vcov.modules.data_handling.covariance_handler import CovarianceHandler
+from vcov.modules.models.lstm_model import KerasTCN, LSTM
 
 
 @pytest.fixture()
@@ -48,3 +49,14 @@ def cov_data(data_dir):
                         returns=True).get_data()
     cov = CovarianceHandler(lookback=15, n_assets=4)
     return cov.split_covariance_to_wide(cov.calculate_rolling_covariance_matrix(data))
+
+
+@pytest.fixture()
+def tcn():
+    return KerasTCN(shape=(5, 5), nb_filters=25, kernel_size=3, nb_stacks=1, dilations=(1, 2), dropout=0.2,
+                    padding="same")
+
+
+@pytest.fixture()
+def lstm():
+    return LSTM(shape=(5, 10), architecture=[5, 5, 5], dropout_rate=0.1)

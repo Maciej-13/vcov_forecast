@@ -1,13 +1,13 @@
 import numpy as np
 
 from numpy.testing import assert_array_equal
-from vcov.modules.strategy.backtesting import Backtesting
+from vcov.modules.strategy.base_strategy import Strategy
 
 
 def test_backtesting(mocker, prices):
-    mocker.patch.multiple(Backtesting, __abstractmethods__=set())
-    bt = Backtesting(prices, assets=['AAPL', 'F'])
-    assert isinstance(bt, Backtesting)
+    mocker.patch.multiple(Strategy, __abstractmethods__=set())
+    bt = Strategy(prices, assets=['AAPL', 'F'])
+    assert isinstance(bt, Strategy)
     assert hasattr(bt, '_index')
     assert hasattr(bt, '_data')
     assert hasattr(bt, 'assets')
@@ -17,15 +17,15 @@ def test_backtesting(mocker, prices):
 
 
 def test_handle_data(mocker, prices):
-    mocker.patch.multiple(Backtesting, __abstractmethods__=set())
-    bt = Backtesting(prices, assets=['AAPL'])
+    mocker.patch.multiple(Strategy, __abstractmethods__=set())
+    bt = Strategy(prices, assets=['AAPL'])
     assert bt.assets == ['AAPL']
     assert_array_equal(getattr(bt, '_data').ravel(), prices["AAPL"].to_numpy())
 
 
 def test_handle_data_multiple(multiple_prices, mocker):
-    mocker.patch.multiple(Backtesting, __abstractmethods__=set())
-    bt = Backtesting(multiple_prices, ['AAPL', 'MSFT'])
+    mocker.patch.multiple(Strategy, __abstractmethods__=set())
+    bt = Strategy(multiple_prices, ['AAPL', 'MSFT'])
     assert bt.assets == ['AAPL', 'MSFT']
     assert getattr(bt, '_index').equals(multiple_prices.index)
     prices = getattr(bt, '_data')
@@ -35,22 +35,22 @@ def test_handle_data_multiple(multiple_prices, mocker):
 
 
 def test_get_slice(multiple_prices, mocker):
-    mocker.patch.multiple(Backtesting, __abstractmethods__=set())
-    bt = Backtesting(multiple_prices, ['AAPL', 'BAC', 'MSFT', 'GOOG'])
+    mocker.patch.multiple(Strategy, __abstractmethods__=set())
+    bt = Strategy(multiple_prices, ['AAPL', 'BAC', 'MSFT', 'GOOG'])
     for i in range(100, len(multiple_prices)):
         np.testing.assert_array_equal(bt._get_slice(i, 100), multiple_prices[i - 99: i + 1].values)
 
 
-def test_get_slice_expanding(multiple_prices, mocker):
-    mocker.patch.multiple(Backtesting, __abstractmethods__=set())
-    bt = Backtesting(multiple_prices, ['AAPL', 'BAC', 'MSFT', 'GOOG'])
+def test_get_slice_expanding(multiple_prices, asset_names, mocker):
+    mocker.patch.multiple(Strategy, __abstractmethods__=set())
+    bt = Strategy(multiple_prices, asset_names)
     for i in range(1, len(multiple_prices)):
         s = i - 99 if i >= 99 else 0
         np.testing.assert_array_equal(bt._get_slice(i, 100), multiple_prices[s: i + 1].values)
 
 
 def test_apply_strategy(multiple_prices):
-    class MockBacktest(Backtesting):
+    class MockBacktest(Strategy):
         def logic(self, counter: int, prices: np.ndarray) -> float:
             return sum(counter * prices)
 

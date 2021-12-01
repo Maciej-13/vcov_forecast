@@ -2,12 +2,12 @@ from abc import ABC, abstractmethod
 
 import numpy as np
 
-from typing import List, Dict, Tuple
+from typing import List, Tuple
 from pandas.core.frame import DataFrame
-from pandas.core.index import Index
+from pandas import Index
 
 
-class Backtesting(ABC):
+class Strategy(ABC):
 
     def __init__(self, data: DataFrame, assets: List[str]) -> None:
         self._index, self._data = self._handle_data(data, assets)
@@ -15,7 +15,7 @@ class Backtesting(ABC):
 
     @abstractmethod
     def logic(self, counter: int, prices: np.ndarray) -> float:
-        pass
+        raise NotImplementedError("Abstract method must be implemented in the derived class!")
 
     def apply_strategy(self) -> List[float]:
         return [self.logic(i, row) for i, row in enumerate(self._data)]

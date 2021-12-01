@@ -43,6 +43,11 @@ def multiple_prices(data_dir):
 
 
 @pytest.fixture()
+def asset_names():
+    return ['AAPL', 'BAC', 'MSFT', 'GOOG']
+
+
+@pytest.fixture()
 def returns_no_idx(returns):
     data = returns.reset_index(drop=True)
     return data

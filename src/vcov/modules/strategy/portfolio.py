@@ -9,7 +9,8 @@ class Portfolio:
     buy_prices: Dict[str, float] = field(default_factory=dict)
 
     def __post_init__(self):
-        self._weights_validation()
+        if self.weights:
+            self._weights_validation()
 
     def update_weights(self, weights: Dict[str, float]) -> None:
         self.weights.update(weights)
@@ -31,16 +32,14 @@ class Portfolio:
             self.buy_prices = {a: p for a, p in self.buy_prices.items() if a not in assets}
 
     def add_asset(self, assets: Union[str, List[str]], weights: Dict[str, float],
-                  buy_prices: Union[float, Dict[str, float]]) -> None:
+                  buy_prices: Dict[str, float]) -> None:
         self.update_weights(weights)
+        self.update_buy_prices(buy_prices)
 
         if isinstance(assets, str):
             self.assets.append(assets)
-            if isinstance(buy_prices, float):
-                self.buy_prices[assets] = buy_prices
         else:
             self.assets.extend(assets)
-            self.update_buy_prices(buy_prices)
 
     def _weights_validation(self):
         if sum(self.weights.values()) != 1:

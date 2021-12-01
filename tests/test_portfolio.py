@@ -85,7 +85,7 @@ def test_remove_asset_multiple():
 def test_add_asset_single():
     port = Portfolio(assets=['a', 'b'], weights={'a': 0.5, 'b': 0.5}, buy_prices={'a': 1, 'b': 1})
     assert len(port.assets) == 2
-    port.add_asset('c', {'c': 0.2, 'a': 0.2, 'b': 0.6}, buy_prices=0.35)
+    port.add_asset('c', {'c': 0.2, 'a': 0.2, 'b': 0.6}, buy_prices={'c': 0.35})
     assert port.assets == ['a', 'b', 'c']
     assert port.weights == {'a': 0.2, 'b': 0.6, 'c': 0.2}
     assert port.buy_prices['c'] == 0.35

@@ -62,4 +62,4 @@ class PerformanceStatistics:
 
     @staticmethod
     def _calculate_r(prices: Series) -> Series:
-        return prices / prices.shift(1)
+        return prices / prices.shift(1) - 1

@@ -1,5 +1,5 @@
-from dataclasses import dataclass, field
-from typing import Optional, Dict, Union, List
+from dataclasses import dataclass
+from typing import Optional, Union, List
 
 # Source: https://pyportfolioopt.readthedocs.io/en/latest/RiskModels.html
 RISK_MODELS = [
@@ -25,13 +25,13 @@ VALID_COV = RISK_MODELS + ESTIMATORS
 @dataclass
 class StrategyParameters:
     window: int
-    covariance: str
+    covariance_model: str
+    portfolio_value: Union[int, float]
     rebalancing: Optional[int] = None
     fees: Optional[float] = None
-    additional: Dict[str, Union[int, float, str]] = field(default_factory=dict)
 
     def __post_init__(self):
-        self._validate_covariance(self.covariance)
+        self._validate_covariance(self.covariance_model)
 
     @staticmethod
     def _validate_covariance(covariance: str, valid_methods: Optional[List[str]] = None):

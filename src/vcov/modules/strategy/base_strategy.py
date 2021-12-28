@@ -1,17 +1,22 @@
-from abc import ABC, abstractmethod
-
 import numpy as np
 
-from typing import List, Tuple
+from abc import ABC, abstractmethod
+from typing import List, Tuple, Union, Optional
 from pandas.core.frame import DataFrame
 from pandas import Index
+
+from vcov.modules.trade.trade import TradeHistory
 
 
 class Strategy(ABC):
 
-    def __init__(self, data: DataFrame, assets: List[str]) -> None:
+    def __init__(self, data: DataFrame, assets: List[str], portfolio_value: Union[int, float],
+                 fee_multiplier: Optional[float]) -> None:
         self._index, self._data = self._handle_data(data, assets)
         self.assets = assets
+        self.portfolio_value = portfolio_value
+        self.trading = TradeHistory()
+        self.fee_multiplier: Optional[float] = fee_multiplier
 
     @abstractmethod
     def logic(self, counter: int, prices: np.ndarray) -> float:

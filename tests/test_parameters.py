@@ -9,18 +9,18 @@ def test_parameters():
     assert params.window == 100
     assert params.covariance_model == 'sample_cov'
     assert params.rebalancing is None
-    assert params.fees is None
+    assert params.fee_multiplier is None
 
 
 def test_parameters_rebalancing():
     params = StrategyParameters(100, 'sample_cov', rebalancing=100, portfolio_value=1000)
     assert params.rebalancing == 100
-    assert params.fees is None
+    assert params.fee_multiplier is None
 
 
 def test_parameters_fees():
-    params = StrategyParameters(100, 'sample_cov', fees=0.01, portfolio_value=1000)
-    assert params.fees == 0.01
+    params = StrategyParameters(100, 'sample_cov', fee_multiplier=0.01, portfolio_value=1000)
+    assert params.fee_multiplier == 0.01
     assert params.rebalancing is None
 
 

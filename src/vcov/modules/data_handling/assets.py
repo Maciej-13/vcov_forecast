@@ -3,17 +3,19 @@ import pandas as pd
 import numpy as np
 
 from dataclasses import dataclass
-from typing import List, Tuple
+from typing import List, Tuple, Optional
 from pandas.core.frame import DataFrame
 
 
 @dataclass
 class Assets:
-    tickers: List[str]
     prices: DataFrame
+    tickers: Optional[List[str]] = None
     log_returns: bool = False
 
     def __post_init__(self):
+        self.tickers = [c.split("_")[-1] for c in self.prices.columns]
+        self.prices.columns = self.tickers
         self.returns: DataFrame = self._calculate_returns(self.log_returns)
 
     def split_by_date(self, date: str) -> Tuple[Assets, Assets]:

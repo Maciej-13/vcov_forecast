@@ -28,7 +28,7 @@ class StrategyParameters:
     covariance_model: str
     portfolio_value: Union[int, float]
     rebalancing: Optional[int] = None
-    fees: Optional[float] = None
+    fee_multiplier: Optional[float] = None
 
     def __post_init__(self):
         self._validate_covariance(self.covariance_model)

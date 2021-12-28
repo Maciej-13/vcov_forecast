@@ -3,17 +3,16 @@ import numpy as np
 from abc import ABC, abstractmethod
 from typing import List, Tuple, Union, Optional
 from pandas.core.frame import DataFrame
-from pandas import Index
+from pandas import Index, Series
 
 from vcov.modules.trade.trade import TradeHistory
 
 
 class Strategy(ABC):
 
-    def __init__(self, data: DataFrame, assets: List[str], portfolio_value: Union[int, float],
-                 fee_multiplier: Optional[float]) -> None:
-        self._index, self._data = self._handle_data(data, assets)
-        self.assets = assets
+    def __init__(self, data: DataFrame, portfolio_value: Union[int, float], fee_multiplier: Optional[float]) -> None:
+        self._index, self._data = self._handle_data(data)
+        self.assets: List[str] = list(data.columns)
         self.portfolio_value = portfolio_value
         self.trading = TradeHistory()
         self.fee_multiplier: Optional[float] = fee_multiplier
@@ -22,8 +21,8 @@ class Strategy(ABC):
     def logic(self, counter: int, prices: np.ndarray) -> float:
         raise NotImplementedError("Abstract method must be implemented in the derived class!")
 
-    def apply_strategy(self) -> List[float]:
-        return [self.logic(i, row) for i, row in enumerate(self._data)]
+    def apply_strategy(self) -> Series:
+        return Series([self.logic(i, row) for i, row in enumerate(self._data)], index=self._index)
 
     def _get_slice(self, current_observation: int, last_observations: int) -> np.ndarray:
         start: int = current_observation - last_observations + 1
@@ -31,9 +30,5 @@ class Strategy(ABC):
         return self._data[start:current_observation + 1, :]
 
     @staticmethod
-    def _handle_data(data: DataFrame, assets: List[str]) -> Tuple[Index, np.ndarray]:
-        columns: List[str] = list(set(c.split('_')[-1] for c in data.columns))
-        to_drop: List[str] = [c for c in columns if c not in assets]
-        for c in to_drop:
-            data = data.drop(list(data.filter(like=c).columns), axis=1)
+    def _handle_data(data: DataFrame) -> Tuple[Index, np.ndarray]:
         return data.index, data.to_numpy()

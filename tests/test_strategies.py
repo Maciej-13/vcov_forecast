@@ -14,7 +14,7 @@ def test_resolve_allocation():
 
 
 def test_equally_weighted(multiple_prices, asset_names):
-    strategy = EquallyWeighted(multiple_prices, asset_names, 1000, None)
+    strategy = EquallyWeighted(multiple_prices, 1000, None)
     assert hasattr(strategy, "portfolio")
     assert isinstance(strategy.portfolio, Portfolio)
     assert strategy.portfolio.assets == asset_names
@@ -24,28 +24,28 @@ def test_equally_weighted(multiple_prices, asset_names):
     np.testing.assert_array_equal(data, multiple_prices.values)
 
 
-def test_equally_weighted_logic(multiple_prices, asset_names):
-    strategy = EquallyWeighted(multiple_prices, asset_names, 1000, None)
+def test_equally_weighted_logic(multiple_prices):
+    strategy = EquallyWeighted(multiple_prices, 1000, None)
     weighted_price = strategy.logic(0, multiple_prices.iloc[0, :].values)
     wp = sum(multiple_prices.iloc[0, :].values * 0.25)
     assert weighted_price == wp
 
 
 def test_equally_weighted_portfolio_characteristics(multiple_prices, asset_names):
-    strategy = EquallyWeighted(multiple_prices, asset_names, 1000, None)
+    strategy = EquallyWeighted(multiple_prices, 1000, None)
     _ = strategy.logic(0, multiple_prices.iloc[0, :].values)
     assert strategy.portfolio.weights == {i: 0.25 for i in asset_names}
 
 
-def test_equally_weighted_portfolio_apply_strategy(multiple_prices, asset_names):
-    strategy = EquallyWeighted(multiple_prices, asset_names, 1000, None)
+def test_equally_weighted_portfolio_apply_strategy(multiple_prices):
+    strategy = EquallyWeighted(multiple_prices, 1000, None)
     results = strategy.apply_strategy()
     weighted_prices = (multiple_prices * 1 / 4).sum(axis=1).to_list()
     assert all(round(i, 10) == round(j, 10) for i, j in zip(results, weighted_prices))
 
 
-def test_equally_weighted_portfolio_trades(multiple_prices, asset_names):
-    strategy = EquallyWeighted(multiple_prices, asset_names, 1000, None)
+def test_equally_weighted_portfolio_trades(multiple_prices):
+    strategy = EquallyWeighted(multiple_prices, 1000, None)
     _ = strategy.apply_strategy()
     assert isinstance(strategy.trading.history, dict)
     assert list(strategy.trading.history.keys()) == [0]

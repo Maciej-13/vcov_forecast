@@ -18,10 +18,9 @@ def resolve_allocation(assets: List[str], weights: Dict[str, float], prices: np.
 
 class EquallyWeighted(Strategy):
 
-    def __init__(self, data: DataFrame, assets: List[str], portfolio_value: Union[int, float],
-                 fee_multiplier: Optional[float]) -> None:
-        super().__init__(data, assets, portfolio_value, fee_multiplier)
-        self.portfolio = Portfolio(assets=assets)
+    def __init__(self, data: DataFrame, portfolio_value: Union[int, float], fee_multiplier: Optional[float]) -> None:
+        super().__init__(data, portfolio_value, fee_multiplier)
+        self.portfolio = Portfolio(assets=self.assets)
 
     def logic(self, counter: int, prices: np.ndarray) -> Union[float, np.ndarray]:
         if counter == 0:

@@ -5,6 +5,7 @@ import pickle
 from unittest.mock import patch
 
 import numpy as np
+import pandas as pd
 
 from vcov.modules.trade.trade import Trade, TradeHistory
 
@@ -38,89 +39,93 @@ def test_trade_history():
 
 def test_trade_history_register():
     history = TradeHistory()
-    history.register(0, 'test', 10, 2.5, True, 0.01)
-    history.register(0, 'test2', 5, 0.5, False, 0.02)
-    history.register(1, 'test', 10, 2.5, False, 0.01)
-    history.register(1, 'test2', 5, 0.5, True, 0.02)
+    dts = pd.date_range('01-01-2021', '01-02-2021')
+    history.register(dts[0], 'test', 10, 2.5, True, 0.01)
+    history.register(dts[0], 'test2', 5, 0.5, False, 0.02)
+    history.register(dts[1], 'test', 10, 2.5, False, 0.01)
+    history.register(dts[1], 'test2', 5, 0.5, True, 0.02)
 
-    assert history.history[0][0].asset == 'test'
-    assert history.history[0][0].quantity == 10
-    assert history.history[0][0].price == 2.5
-    assert history.history[0][0].buy is True
-    assert history.history[0][0].fee_multiplier == 0.01
+    assert history.history[dts[0]][0].asset == 'test'
+    assert history.history[dts[0]][0].quantity == 10
+    assert history.history[dts[0]][0].price == 2.5
+    assert history.history[dts[0]][0].buy is True
+    assert history.history[dts[0]][0].fee_multiplier == 0.01
 
-    assert history.history[0][1].asset == 'test2'
-    assert history.history[0][1].quantity == 5
-    assert history.history[0][1].price == .5
-    assert history.history[0][1].buy is False
-    assert history.history[0][1].fee_multiplier == 0.02
+    assert history.history[dts[0]][1].asset == 'test2'
+    assert history.history[dts[0]][1].quantity == 5
+    assert history.history[dts[0]][1].price == .5
+    assert history.history[dts[0]][1].buy is False
+    assert history.history[dts[0]][1].fee_multiplier == 0.02
 
-    assert history.history[1][0].asset == 'test'
-    assert history.history[1][0].quantity == 10
-    assert history.history[1][0].price == 2.5
-    assert history.history[1][0].buy is False
-    assert history.history[1][0].fee_multiplier == 0.01
+    assert history.history[dts[1]][0].asset == 'test'
+    assert history.history[dts[1]][0].quantity == 10
+    assert history.history[dts[1]][0].price == 2.5
+    assert history.history[dts[1]][0].buy is False
+    assert history.history[dts[1]][0].fee_multiplier == 0.01
 
-    assert history.history[1][1].asset == 'test2'
-    assert history.history[1][1].quantity == 5
-    assert history.history[1][1].price == .5
-    assert history.history[1][1].buy is True
-    assert history.history[1][1].fee_multiplier == 0.02
+    assert history.history[dts[1]][1].asset == 'test2'
+    assert history.history[dts[1]][1].quantity == 5
+    assert history.history[dts[1]][1].price == .5
+    assert history.history[dts[1]][1].buy is True
+    assert history.history[dts[1]][1].fee_multiplier == 0.02
 
 
 def test_trade_history_register_multiple():
     history = TradeHistory()
-    history.register(0, ['test', 'test2'], [10, 5], np.array([2.5, 5]), True, [0.1, 0.1])
+    dt = pd.to_datetime('06-23-2020')
+    history.register(dt, ['test', 'test2'], [10, 5], np.array([2.5, 5]), True, 0.1)
 
-    assert history.history[0][0].asset == 'test'
-    assert history.history[0][0].quantity == 10
-    assert history.history[0][0].price == 2.5
-    assert history.history[0][0].buy is True
-    assert history.history[0][0].fee_multiplier == 0.1
+    assert history.history[dt][0].asset == 'test'
+    assert history.history[dt][0].quantity == 10
+    assert history.history[dt][0].price == 2.5
+    assert history.history[dt][0].buy is True
+    assert history.history[dt][0].fee_multiplier == 0.1
 
-    assert history.history[0][1].asset == 'test2'
-    assert history.history[0][1].quantity == 5
-    assert history.history[0][1].price == 5
-    assert history.history[0][1].buy is True
-    assert history.history[0][1].fee_multiplier == 0.1
+    assert history.history[dt][1].asset == 'test2'
+    assert history.history[dt][1].quantity == 5
+    assert history.history[dt][1].price == 5
+    assert history.history[dt][1].buy is True
+    assert history.history[dt][1].fee_multiplier == 0.1
 
-    history.register(1, 'test3', 1, 100, True, 0.01)
-    history.register(1, ['test', 'test2'], [10, 5], np.array([2.5, 5]), False, [0.1, 0.1])
+    dt = pd.to_datetime('06-24-2020')
+    history.register(dt, 'test3', 1, 100, True, 0.01)
+    history.register(dt, ['test', 'test2'], [10, 5], np.array([2.5, 5]), False, 0.1)
 
-    assert history.history[1][0].asset == 'test3'
-    assert history.history[1][0].quantity == 1
-    assert history.history[1][0].price == 100
-    assert history.history[1][0].buy is True
-    assert history.history[1][0].fee_multiplier == 0.01
+    assert history.history[dt][0].asset == 'test3'
+    assert history.history[dt][0].quantity == 1
+    assert history.history[dt][0].price == 100
+    assert history.history[dt][0].buy is True
+    assert history.history[dt][0].fee_multiplier == 0.01
 
-    assert history.history[1][1].asset == 'test'
-    assert history.history[1][1].quantity == 10
-    assert history.history[1][1].price == 2.5
-    assert history.history[1][1].buy is False
-    assert history.history[1][1].fee_multiplier == 0.1
+    assert history.history[dt][1].asset == 'test'
+    assert history.history[dt][1].quantity == 10
+    assert history.history[dt][1].price == 2.5
+    assert history.history[dt][1].buy is False
+    assert history.history[dt][1].fee_multiplier == 0.1
 
-    assert history.history[1][2].asset == 'test2'
-    assert history.history[1][2].quantity == 5
-    assert history.history[1][2].price == 5
-    assert history.history[1][2].buy is False
-    assert history.history[1][2].fee_multiplier == 0.1
+    assert history.history[dt][2].asset == 'test2'
+    assert history.history[dt][2].quantity == 5
+    assert history.history[dt][2].price == 5
+    assert history.history[dt][2].buy is False
+    assert history.history[dt][2].fee_multiplier == 0.1
 
 
 def test_trade_history_save(data_dir):
+    dts = pd.date_range('01-01-2021', '01-02-2021')
     history = TradeHistory()
-    history.register(0, 'test', 10, 2.5, True, 0.01)
-    history.register(0, 'test2', 5, 0.5, False, 0.02)
-    history.register(1, 'test', 10, 2.5, False, 0.01)
-    history.register(1, 'test2', 5, 0.5, True, 0.02)
+    history.register(dts[0], 'test', 10, 2.5, True, 0.01)
+    history.register(dts[0], 'test2', 5, 0.5, False, 0.02)
+    history.register(dts[1], 'test', 10, 2.5, False, 0.01)
+    history.register(dts[1], 'test2', 5, 0.5, True, 0.02)
     history.save(f'{data_dir}/test')
     assert os.path.exists(f'{data_dir}/test.pickle')
 
     with open(f'{data_dir}/test.pickle', 'rb') as f:
         h = pickle.load(f)
 
-    assert h[0][0] == history.history[0][0]
-    assert h[0][1] == history.history[0][1]
-    assert h[1][0] == history.history[1][0]
-    assert h[1][1] == history.history[1][1]
+    assert h[dts[0]][0] == history.history[dts[0]][0]
+    assert h[dts[0]][1] == history.history[dts[0]][1]
+    assert h[dts[1]][0] == history.history[dts[1]][0]
+    assert h[dts[1]][1] == history.history[dts[1]][1]
 
     os.remove(f'{data_dir}/test.pickle')

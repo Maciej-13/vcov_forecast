@@ -1,7 +1,7 @@
 import pickle
-import numpy as np
 from dataclasses import dataclass, field
 from typing import Dict, Union, List, Optional
+from pandas import Series, Timestamp
 
 
 @dataclass
@@ -27,10 +27,13 @@ class Trade:
 
 @dataclass
 class TradeHistory:
-    history: Dict[int, Dict[int, Trade]] = field(default_factory=dict)
+    history: Dict[Timestamp, Dict[int, Trade]] = field(default_factory=dict)
 
-    def __register_single_asset(self, stamp: int, asset: str, quantity: int, price: float, buy: bool,
+    def __register_single_asset(self, stamp: Timestamp, asset: str, quantity: int, price: float, buy: bool,
                                 fee_multiplier: Optional[float]) -> None:
+        if quantity == 0:
+            pass
+
         if stamp not in self.history:
             self.history[stamp] = {
                 0: Trade(asset=asset, quantity=quantity, price=price, buy=buy, fee_multiplier=fee_multiplier)}
@@ -39,43 +42,43 @@ class TradeHistory:
             self.history[stamp].update(
                 {k: Trade(asset=asset, quantity=quantity, price=price, buy=buy, fee_multiplier=fee_multiplier)})
 
-    def __register_multiple_assets(self, stamp: int, asset: List[str], quantity: List[int], price: np.ndarray,
-                                   buy: bool, fee_multiplier: Optional[List[Optional[float]]]) -> None:
-        if fee_multiplier is None:
-            fee_multiplier = [None] * len(asset)
-        if not len(asset) == len(quantity) == len(price) == len(fee_multiplier):
-            raise ValueError("Length of arguments: asset, quantity, price, fee multiplier must be the same!")
+    def __register_multiple_assets(self, stamp: Timestamp, asset: List[str], quantity: List[int], price: Series,
+                                   buy: bool, fee_multiplier: Optional[float]) -> None:
+        if not len(asset) == len(quantity) == len(price):
+            raise ValueError("Length of arguments: asset, quantity, price must be the same!")
 
         if stamp not in self.history:
-            self.history[stamp] = {i: Trade(asset=asset[i], quantity=quantity[i], price=price[i], buy=buy,
-                                            fee_multiplier=fee_multiplier[i]) for i in range(len(asset))}
+            for i in range(len(asset)):
+                self.history[stamp] = {i: Trade(asset=asset[i], quantity=quantity[i], price=price[i], buy=buy,
+                                                fee_multiplier=fee_multiplier) for i in range(len(asset)) if
+                                       quantity[i] != 0}
         else:
             k: int = list(self.history[stamp])[-1] + 1
             self.history[stamp].update(
                 {k + i: Trade(asset=asset[i], quantity=quantity[i], price=price[i], buy=buy,
-                              fee_multiplier=fee_multiplier[i]) for i in range(len(asset))}
+                              fee_multiplier=fee_multiplier) for i in range(len(asset)) if quantity[i] != 0}
             )
 
-    def register(self, stamp: int, asset: Union[str, List[str]], quantity: Union[int, List[int]],
-                 price: Union[float, np.ndarray], buy: bool,
-                 fee_multiplier: Union[Optional[float], List[Optional[float]]]) -> None:
+    def register(self, stamp: Timestamp, asset: Union[str, List[str]], quantity: Union[int, List[int]],
+                 price: Union[float, Series], buy: bool,
+                 fee_multiplier: Optional[float]) -> None:
         if isinstance(asset, list):
             self.__register_multiple_assets(
-                stamp=stamp,  # type: ignore
+                stamp=stamp,
                 asset=asset,  # type: ignore
                 quantity=quantity,  # type: ignore
                 price=price,  # type: ignore
                 buy=buy,
-                fee_multiplier=fee_multiplier  # type: ignore
+                fee_multiplier=fee_multiplier
             )
         else:
             self.__register_single_asset(
-                stamp=stamp,  # type: ignore
+                stamp=stamp,
                 asset=asset,  # type: ignore
                 quantity=quantity,  # type: ignore
                 price=price,  # type: ignore
                 buy=buy,
-                fee_multiplier=fee_multiplier  # type: ignore
+                fee_multiplier=fee_multiplier
             )
 
     def save(self, path_filename: str) -> None:

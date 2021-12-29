@@ -31,5 +31,5 @@ class Portfolio:
             self.assets.extend(assets)
 
     def _weights_validation(self):
-        if round(sum(self.weights.values()), 10) != 1:
+        if round(sum(self.weights.values()), 2) != 1:
             raise ValueError("The weights do not add up to 1!")

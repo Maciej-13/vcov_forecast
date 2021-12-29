@@ -8,6 +8,7 @@ from pandas.core.series import Series
 class PerformanceStatistics:
 
     def get_performance_statistics(self, prices: Series, scale: int = 365) -> Dict[str, float]:
+        prices = prices.dropna()
         arc = self.annualized_returns(prices, scale)
         asd = self.annualized_standard_deviation(prices, scale)
         ir = self.information_ratio(prices, scale)
@@ -18,27 +19,29 @@ class PerformanceStatistics:
 
     @staticmethod
     def annualized_returns(prices: Series, scale: int = 365) -> float:
-        r: float = (prices.iloc[-1] / prices.iloc[0])
+        r: float = (prices.dropna().iloc[-1] / prices.dropna().iloc[0])
         return r ** (scale / len(prices)) - 1
 
     def annualized_standard_deviation(self, prices: Series, scale: int = 365) -> float:
-        r: Series = self._calculate_r(prices)
+        r: Series = self._calculate_r(prices.dropna())
         asd: float = np.std(r) * np.sqrt(scale)
         return asd
 
     @staticmethod
     def maximum_daily_drawdown(prices: Series) -> Series:
-        return (prices / prices.cummax() - 1).cummin()
+        return (prices.dropna() / prices.dropna().cummax() - 1).cummin()
 
     def maximum_drawdown(self, prices) -> float:
-        md: float = min(self.maximum_daily_drawdown(prices))
+        md: float = min(self.maximum_daily_drawdown(prices.dropna()))
         return md
 
     def information_ratio(self, prices: Series, scale: int = 365) -> float:
-        return self.annualized_returns(prices, scale) / self.annualized_standard_deviation(prices, scale)
+        return self.annualized_returns(prices.dropna(), scale) / self.annualized_standard_deviation(prices.dropna(),
+                                                                                                    scale)
 
     @staticmethod
     def loss_duration(prices: Series, scale: int = 365) -> Series:
+        prices = prices.dropna()
         current: float = prices.iloc[0]
         ld: List[int] = []
         for i, p in enumerate(prices):
@@ -51,15 +54,15 @@ class PerformanceStatistics:
         return pd.Series(ld, index=prices.index) / scale
 
     def max_loss_duration(self, prices: Series, scale: int = 365) -> float:
-        ld: Series = self.loss_duration(prices, scale)
+        ld: Series = self.loss_duration(prices.dropna(), scale)
         mld: float = max(ld)
         return mld
 
     @staticmethod
     def cumulative_returns(prices: Series) -> Series:
-        returns: Series = prices.pct_change()
+        returns: Series = prices.dropna().pct_change()
         return (returns + 1).cumprod() - 1
 
     @staticmethod
     def _calculate_r(prices: Series) -> Series:
-        return prices / prices.shift(1) - 1
+        return prices.dropna() / prices.dropna().shift(1) - 1

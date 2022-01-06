@@ -15,6 +15,7 @@ class Strategy(ABC):
         self._data = data
         self.assets: List[str] = list(data.columns)
         self.portfolio_value = portfolio_value
+        self.cash: float = 0.0
         self.portfolio = Portfolio(assets=self.assets)
         self.trading = TradeHistory()
         self.fee_multiplier: Optional[float] = fee_multiplier
@@ -26,6 +27,13 @@ class Strategy(ABC):
     def apply_strategy(self, **kwargs) -> Series:
         return Series([self.logic(i, self._data.iloc[i], **kwargs) for i in range(len(self._data))],
                       index=self._data.index)
+
+    def _calculate_portfolio_value(self, prices) -> float:
+        portfolio_value: float = self.cash - self.trading.accumulated_fees + np.dot(
+            np.fromiter(self.portfolio.stocks.values(), dtype=float), prices[self.portfolio.stocks.keys()])
+        if portfolio_value <= 0:
+            return 0.0
+        return portfolio_value
 
     def _get_slice(self, current_idx: Timestamp, last_observations: int) -> DataFrame:
         df = self._data.loc[self._data.index <= current_idx].copy(deep=True)

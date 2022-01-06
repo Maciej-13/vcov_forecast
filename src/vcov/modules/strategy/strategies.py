@@ -2,7 +2,7 @@ import inspect
 import numpy as np
 
 from pandas import DataFrame, Series
-from typing import List, Union, Optional, Dict
+from typing import Union, Optional, Dict, Tuple
 
 from pypfopt.discrete_allocation import DiscreteAllocation
 from pypfopt import risk_models, expected_returns, EfficientFrontier
@@ -10,10 +10,26 @@ from pypfopt.objective_functions import transaction_cost
 
 from vcov.modules.strategy.base_strategy import Strategy
 
+Allocation = Tuple[Dict[str, int], float]
+Orders = Tuple[Dict[str, int], Dict[str, int]]
 
-def resolve_allocation(weights: Dict[str, float], prices: Series, portfolio_value: Union[int, float]) -> List[int]:
-    allocation = DiscreteAllocation(weights, prices, portfolio_value).greedy_portfolio()[0]
-    return [allocation.get(i) if allocation.get(i) is not None else 0 for i in prices.index]
+
+def resolve_allocation(weights: Dict[str, float], prices: Series, portfolio_value: Union[int, float]) -> Allocation:
+    allocation, cash = DiscreteAllocation(weights, prices, portfolio_value).greedy_portfolio()
+    return {k: (0 if v is None else v) for k, v in allocation.items()}, cash
+
+
+def resolve_order_amounts(old_stocks: Dict[str, int], new_stocks: Dict[str, int]) -> Orders:
+    old_stocks = {k: v for k, v in old_stocks.items() if v != 0}
+    new_stocks = {k: v for k, v in new_stocks.items() if v != 0}
+    to_sell = {k: v for k, v in old_stocks.items() if k not in new_stocks.keys()}
+    to_buy = {k: v for k, v in new_stocks.items() if k not in old_stocks.keys()}
+    for k, v in new_stocks.items():
+        if k in old_stocks.keys() and v > old_stocks[k]:
+            to_buy.update({k: v - old_stocks[k]})
+        elif k in old_stocks.keys() and v < old_stocks[k]:
+            to_sell.update({k: old_stocks[k] - v})
+    return to_sell, to_buy
 
 
 class EquallyWeighted(Strategy):
@@ -23,15 +39,19 @@ class EquallyWeighted(Strategy):
             self.portfolio.update_weights(
                 {i: 1 / len(self.assets) for i in self.assets}
             )
+            allocation, cash = resolve_allocation(self.portfolio.weights, prices, self.portfolio_value)
+            self.cash = cash
+            self.portfolio.update_stocks(allocation)
             self.trading.register(
                 stamp=prices.name,
-                asset=self.assets,
-                quantity=resolve_allocation(self.portfolio.weights, prices, self.portfolio_value),
+                asset=list(allocation.keys()),
+                quantity=list(allocation.values()),
                 price=prices,
                 buy=True,
                 fee_multiplier=self.fee_multiplier
             )
-        return np.dot(np.fromiter(self.portfolio.weights.values(), dtype=float), prices.values)
+            self.portfolio_value = self._calculate_portfolio_value(prices)
+        return self._calculate_portfolio_value(prices)
 
 
 class RiskModels(Strategy):
@@ -50,16 +70,16 @@ class RiskModels(Strategy):
             if counter == self.window - 1:
                 return self._single_logic(prices, **kwargs)
             else:
-                return np.dot(np.fromiter(self.portfolio.weights.values(), dtype=float), prices)
+                return self._calculate_portfolio_value(prices)
 
         if self.rebalancing is not None:
             if (counter - (self.window - 1)) % self.rebalancing == 0:
                 return self._single_logic(prices, **kwargs)
             else:
-                return np.dot(np.fromiter(self.portfolio.weights.values(), dtype=float), prices)
+                return self._calculate_portfolio_value(prices)
 
     def _optimize_weights(self, prices: Series, covariance_method: str, returns_method: str, optimize: str,
-                          **kwargs) -> None:
+                          **kwargs) -> Dict[str, float]:
         sliced_data = self._get_slice(current_idx=prices.name, last_observations=self.window)
         sample_cov = risk_models.risk_matrix(
             method=covariance_method,
@@ -75,16 +95,32 @@ class RiskModels(Strategy):
             ef.add_objective(transaction_cost, w_prev=w_prev, k=self.fee_multiplier)
         optimizer = getattr(ef, optimize)
         optimizer(**{k: kwargs.pop(k) for k in kwargs if k in inspect.signature(optimizer).parameters.keys()})
-        self.portfolio.update_weights(ef.clean_weights())
+        weights: Dict[str, float] = ef.clean_weights()
+        return weights
 
     def _single_logic(self, prices: Series, **kwargs) -> Union[float, np.ndarray]:
-        self._optimize_weights(prices, **kwargs)
-        self.trading.register(
-            stamp=prices.name,
-            asset=list(self.portfolio.weights.keys()),
-            quantity=resolve_allocation(self.portfolio.weights, prices, self.portfolio_value),
-            price=prices,
-            buy=True,
-            fee_multiplier=self.fee_multiplier
-        )
-        return np.dot(np.fromiter(self.portfolio.weights.values(), dtype=float), prices)
+        new_weights = self._optimize_weights(prices, **kwargs)
+        self.portfolio.update_weights(new_weights)
+        allocation, cash = resolve_allocation(self.portfolio.weights, prices, self.portfolio_value)
+        self.cash = cash
+        to_sell, to_buy = resolve_order_amounts(self.portfolio.stocks, allocation)
+        self.portfolio.update_stocks(allocation)
+        if to_sell:
+            self.trading.register(
+                stamp=prices.name,
+                asset=list(to_sell.keys()),
+                quantity=list(to_sell.values()),
+                price=prices,
+                buy=False,
+                fee_multiplier=self.fee_multiplier
+            )
+        if to_buy:
+            self.trading.register(
+                stamp=prices.name,
+                asset=list(to_buy.keys()),
+                quantity=list(to_buy.values()),
+                price=prices,
+                buy=True,
+                fee_multiplier=self.fee_multiplier
+            )
+        return self._calculate_portfolio_value(prices)

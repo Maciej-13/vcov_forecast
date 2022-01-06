@@ -4,7 +4,6 @@ import pickle
 
 from unittest.mock import patch
 
-import numpy as np
 import pandas as pd
 
 from vcov.modules.trade.trade import Trade, TradeHistory
@@ -73,7 +72,7 @@ def test_trade_history_register():
 def test_trade_history_register_multiple():
     history = TradeHistory()
     dt = pd.to_datetime('06-23-2020')
-    history.register(dt, ['test', 'test2'], [10, 5], np.array([2.5, 5]), True, 0.1)
+    history.register(dt, ['test', 'test2'], [10, 5], pd.Series([2.5, 5], index=['test', 'test2']), True, 0.1)
 
     assert history.history[dt][0].asset == 'test'
     assert history.history[dt][0].quantity == 10
@@ -89,7 +88,7 @@ def test_trade_history_register_multiple():
 
     dt = pd.to_datetime('06-24-2020')
     history.register(dt, 'test3', 1, 100, True, 0.01)
-    history.register(dt, ['test', 'test2'], [10, 5], np.array([2.5, 5]), False, 0.1)
+    history.register(dt, ['test', 'test2'], [10, 5], pd.Series([2.5, 5], index=['test', 'test2']), False, 0.1)
 
     assert history.history[dt][0].asset == 'test3'
     assert history.history[dt][0].quantity == 1

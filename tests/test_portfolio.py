@@ -49,25 +49,36 @@ def test_remove_asset_single():
 
 
 def test_remove_asset_multiple():
-    port = Portfolio(assets=['a', 'b', 'c'], weights={'a': 0.3, 'b': 0.3, 'c': 0.4})
+    port = Portfolio(assets=['a', 'b', 'c'], weights={'a': 0.3, 'b': 0.3, 'c': 0.4}, stocks={'a': 3, 'b': 1, 'c': 1})
     assert len(port.assets) == 3
     port.remove_asset(['a', 'b'])
     assert len(port.assets) == 1
     assert port.assets == ['c']
     assert port.weights == {'c': 0.4}
+    assert port.stocks == {'c': 1}
 
 
 def test_add_asset_single():
     port = Portfolio(assets=['a', 'b'], weights={'a': 0.5, 'b': 0.5})
     assert len(port.assets) == 2
-    port.add_asset('c', {'c': 0.2, 'a': 0.2, 'b': 0.6})
+    port.add_asset('c', {'c': 0.2, 'a': 0.2, 'b': 0.6}, {'a': 2, 'b': 5, 'c': 1})
     assert port.assets == ['a', 'b', 'c']
     assert port.weights == {'a': 0.2, 'b': 0.6, 'c': 0.2}
+    assert port.stocks == {'a': 2, 'b': 5, 'c': 1}
 
 
 def test_add_assets_multiple():
     port = Portfolio(assets=['a', 'b'], weights={'a': 0.5, 'b': 0.5})
     assert len(port.assets) == 2
-    port.add_asset(['c', 'd'], {'a': 0.1, 'b': 0.1, 'c': 0.3, 'd': 0.5})
+    port.add_asset(['c', 'd'], {'a': 0.1, 'b': 0.1, 'c': 0.3, 'd': 0.5}, stocks={'a': 4, 'b': 1, 'c': 3, 'd': 20})
     assert len(port.assets) == 4
     assert port.weights == {'a': 0.1, 'b': 0.1, 'c': 0.3, 'd': 0.5}
+    assert port.stocks == {'a': 4, 'b': 1, 'c': 3, 'd': 20}
+
+
+def test_update_stocks():
+    port = Portfolio(assets=['a', 'b'], weights={'a': 0.5, 'b': 0.5}, stocks={'a': 2, 'b': 5})
+    assert len(port.stocks) == 2
+    port.update_stocks({'a': 6})
+    assert 'b' not in port.stocks
+    assert port.stocks == {'a': 6}

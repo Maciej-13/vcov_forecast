@@ -18,7 +18,7 @@ def test_resolve_allocation():
 
 def test_resolve_order_amounts():
     old_stocks = {'a': 5, 'b': 2, 'c': 3, 'd': 10}
-    new_stocks = {'a': 1, 'b': 7, 'd': 35, 'h': 5}
+    new_stocks = {'a': 1, 'b': 7, 'c': 35, 'h': 5}
     sell, buy = resolve_order_amounts(old_stocks, new_stocks)
     assert sell == {'a': 4, 'd': 10}
     assert buy == {'b': 5, 'c': 32, 'h': 5}

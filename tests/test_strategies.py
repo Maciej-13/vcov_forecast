@@ -1,7 +1,8 @@
 import numpy as np
 import pandas as pd
 
-from vcov.modules.strategy.strategies import EquallyWeighted, resolve_allocation, RiskModels, resolve_order_amounts
+from vcov.modules.strategy.strategies import EquallyWeighted, resolve_allocation, RiskModels, resolve_order_amounts, \
+    LstmModels
 from vcov.modules.portfolio.portfolio import Portfolio
 
 
@@ -66,7 +67,7 @@ def test_equally_weighted_portfolio_apply_strategy(multiple_prices, asset_names)
                                           portfolio_value=1000, prices=multiple_prices.iloc[0])
     multiple_prices = multiple_prices[allocation.keys()]
     weighted_prices = multiple_prices['AAPL'] * allocation['AAPL'] + multiple_prices['BAC'] * allocation['BAC'] + \
-        multiple_prices['MSFT'] * allocation['MSFT'] + cash
+                      multiple_prices['MSFT'] * allocation['MSFT'] + cash
     assert all(round(i, 10) == round(j, 10) for i, j in zip(results, weighted_prices))
 
 
@@ -131,3 +132,57 @@ def test_risk_models_single_logic(multiple_prices):
     assert history[dt][0].asset == 'AAPL'
     assert history[dt][1].asset == 'BAC'
     assert sum(history[dt][i].price * history[dt][i].quantity for i in range(len(history[dt]))) < 1000
+
+
+def test_lstm_models_single_logic(multiple_prices):
+    strategy = LstmModels(multiple_prices, 1000, window=5, warmup_period=150, rebalancing=None, fee_multiplier=0.005)
+    assert not strategy.trading.history
+    value = strategy._single_logic(
+        multiple_prices.iloc[149, :],
+        returns_method='mean_historical_return',
+        optimize='min_volatility',
+        epochs=50,
+        batch_size=2,
+        length=4,
+        architecture=(20, 10),
+        dropout_rate=0.1,
+    )
+    assert isinstance(value, float)
+    assert strategy
+    history = strategy.trading.history
+    dt = multiple_prices.index[149]
+    assert history
+    assert history[dt]
+    assert history[dt][0].asset == 'BAC'
+    assert sum(history[dt][i].price * history[dt][i].quantity for i in range(len(history[dt]))) < 1000
+
+
+def test_lstm_models_apply(multiple_prices):
+    strategy = LstmModels(multiple_prices, 1000, window=20, rebalancing=350, warmup_period=150, fee_multiplier=0.005)
+    results = strategy.apply_strategy(
+        returns_method='mean_historical_return',
+        optimize='min_volatility',
+        epochs=2,
+        batch_size=2,
+        length=4,
+        architecture=(20, 10),
+        dropout_rate=0.1,
+    )
+    assert len(results) == len(multiple_prices)
+    assert len(results.dropna()) == len(multiple_prices) - 149 - 20
+
+
+def test_lstm_models_optimize_weights(multiple_prices):
+    strategy = LstmModels(multiple_prices, 1000, window=20, rebalancing=None, warmup_period=150, fee_multiplier=0.005)
+    assert not list(strategy.portfolio.weights.values())
+    weights = strategy._optimize_weights(
+        multiple_prices.iloc[149, :],
+        returns_method='mean_historical_return',
+        optimize='min_volatility',
+        epochs=2,
+        batch_size=2,
+        length=4,
+        architecture=(20, 10),
+        dropout_rate=0.1,
+    )
+    assert round(sum(weights.values()), 4) == 1

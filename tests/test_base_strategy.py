@@ -23,6 +23,13 @@ def test_get_slice(multiple_prices, mocker):
         pd.testing.assert_frame_equal(bt._get_slice(idx, 100), multiple_prices.iloc[i + 1: i + 101, :])
 
 
+def test_get_slice_full(multiple_prices, mocker):
+    mocker.patch.multiple(Strategy, __abstractmethods__=set())
+    bt = Strategy(multiple_prices, portfolio_value=100, fee_multiplier=0.1)
+    for i, idx in enumerate(multiple_prices.iloc[100:].index):
+        pd.testing.assert_frame_equal(bt._get_slice(idx, None), multiple_prices.iloc[:i + 101, :])
+
+
 def test_apply_strategy(multiple_prices):
     class MockBacktest(Strategy):
         def logic(self, counter: int, prices: pd.Series, **kwargs) -> float:

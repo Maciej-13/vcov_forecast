@@ -35,6 +35,9 @@ class Strategy(ABC):
             return 0.0
         return portfolio_value
 
-    def _get_slice(self, current_idx: Timestamp, last_observations: int) -> DataFrame:
+    def _get_slice(self, current_idx: Timestamp, last_observations: Optional[int]) -> DataFrame:
         df = self._data.loc[self._data.index <= current_idx].copy(deep=True)
-        return df.tail(last_observations).copy(deep=True)
+        if last_observations is not None:
+            return df.tail(last_observations).copy(deep=True)
+        else:
+            return df.copy(deep=True)

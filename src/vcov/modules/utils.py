@@ -1,11 +1,14 @@
-from typing import Optional, Union, List
+from typing import Optional, Union, List, Tuple
+from keras_preprocessing.sequence import TimeseriesGenerator
+
 from vcov.modules.data_handling.input_handler import InputHandler
 from vcov.modules.data_handling.covariance_handler import CovarianceHandler
 from vcov.modules.data_handling.dataset import KerasDataset
 
 
 def get_prepared_generator(path: str, assets: List[str], lookback: int, length: int,
-                           forward_shift: Optional[int] = None, val_size: Union[float, int] = 0.2, **kwargs):
+                           forward_shift: Optional[int] = None, val_size: Union[float, int] = 0.2,
+                           **kwargs) -> Union[Tuple[TimeseriesGenerator, TimeseriesGenerator], TimeseriesGenerator]:
     if 0 < val_size < 1:
         train, val = InputHandler(path, assets).train_test_split(val_size)
         cov_handler = CovarianceHandler(lookback, n_assets=len(assets))

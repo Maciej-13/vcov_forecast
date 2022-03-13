@@ -187,7 +187,7 @@ class LstmModels(Strategy):
         return self._calculate_portfolio_value(prices)
 
     def _optimize_weights(self, prices: Series, returns_method: str, optimize: str, epochs: int, batch_size: int,
-                          length: int, **kwargs) -> Dict[str, float]:
+                          length: int, stopping_patience: int, **kwargs) -> Dict[str, float]:
         sliced_data = self._get_slice(current_idx=prices.name, last_observations=None)
 
         sample_cov = self._estimate_covariance_matrix(
@@ -195,6 +195,7 @@ class LstmModels(Strategy):
             epochs=epochs,
             batch_size=batch_size,
             length=length,
+            stopping_patience=stopping_patience,
             **kwargs
         )
 
@@ -211,7 +212,7 @@ class LstmModels(Strategy):
         return weights
 
     def _estimate_covariance_matrix(self, prices: DataFrame, epochs: int, batch_size: int, length: int,
-                                    **kwargs) -> DataFrame:
+                                    stopping_patience: int, **kwargs) -> DataFrame:
         cov = CovarianceHandler(lookback=self.window, n_assets=len(self.assets))
         train, val = train_test_split(prices, test_size=0.2, random_state=42, shuffle=False)
 
@@ -230,13 +231,19 @@ class LstmModels(Strategy):
             optimizer=tf.keras.optimizers.Adam()
         )
         model: Model = lstm.get_model()
+        stopping = tf.keras.callbacks.EarlyStopping(
+            monitor='val_loss',
+            patience=stopping_patience,
+            mode='auto',
+        )
         model.fit(
             train_gen,
             validation_data=val_gen,
             epochs=epochs,
             batch_size=batch_size,
             verbose=1,
-            shuffle=False
+            shuffle=False,
+            callbacks=[stopping],
         )
 
         predicted: DataFrame = pd.DataFrame(model.predict(val_gen), columns=val_cholesky.columns)

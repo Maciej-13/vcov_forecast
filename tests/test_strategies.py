@@ -146,6 +146,7 @@ def test_lstm_models_single_logic(multiple_prices):
         length=4,
         architecture=(20, 10),
         dropout_rate=0.1,
+        stopping_patience=1,
     )
     assert isinstance(value, float)
     assert strategy
@@ -158,15 +159,16 @@ def test_lstm_models_single_logic(multiple_prices):
 
 
 def test_lstm_models_apply(multiple_prices):
-    strategy = LstmModels(multiple_prices, 1000, window=20, rebalancing=350, warmup_period=150, fee_multiplier=0.005)
+    strategy = LstmModels(multiple_prices, 1000, window=20, rebalancing=None, warmup_period=150, fee_multiplier=0.005)
     results = strategy.apply_strategy(
         returns_method='mean_historical_return',
         optimize='min_volatility',
-        epochs=2,
+        epochs=20,
         batch_size=2,
         length=4,
         architecture=(20, 10),
         dropout_rate=0.1,
+        stopping_patience=5,
     )
     assert len(results) == len(multiple_prices)
     assert len(results.dropna()) == len(multiple_prices) - 149 - 20
@@ -184,5 +186,6 @@ def test_lstm_models_optimize_weights(multiple_prices):
         length=4,
         architecture=(20, 10),
         dropout_rate=0.1,
+        stopping_patience=5,
     )
     assert round(sum(weights.values()), 4) == 1

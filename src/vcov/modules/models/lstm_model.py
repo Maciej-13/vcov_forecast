@@ -7,7 +7,7 @@ from keras import Model
 
 class LSTM:
 
-    def __init__(self, shape: Tuple[int, ...], architecture: List[int], dropout_rate: float,
+    def __init__(self, shape: Tuple[int, ...], architecture: Tuple[int, ...], dropout_rate: float,
                  batch_size: Optional[int] = None, bidirectional: bool = False, merge_mode: Optional[str] = None,
                  convolutional_layer: bool = False, kernel_size: Optional[int] = None, padding: Optional[str] = None,
                  filters: Optional[int] = None, pool_size: Optional[int] = None) -> None:

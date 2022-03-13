@@ -154,7 +154,6 @@ def test_lstm_models_single_logic(multiple_prices):
     dt = multiple_prices.index[149]
     assert history
     assert history[dt]
-    assert history[dt][0].asset == 'BAC'
     assert sum(history[dt][i].price * history[dt][i].quantity for i in range(len(history[dt]))) < 1000
 
 

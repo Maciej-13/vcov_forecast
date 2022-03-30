@@ -1,4 +1,4 @@
-from mxnet.context import gpu
+from mxnet.context import cpu
 from gluonts.mx.trainer import Trainer
 from gluonts.mx.distribution import LowrankMultivariateGaussianOutput, MultivariateGaussianOutput
 from gluonts.mx.distribution.lowrank_gp import LowrankGPOutput
@@ -10,7 +10,7 @@ from vcov.modules.models.hyperparameters import GluonHyperparameters
 
 def trainer_from_params(parameters: GluonHyperparameters) -> Trainer:
     return Trainer(
-        ctx=gpu(0),
+        ctx=cpu(0),
         epochs=parameters.epochs,
         batch_size=parameters.batch_size,
         learning_rate=parameters.learning_rate if parameters.low_rank else parameters.learning_rate_fullrank,
@@ -25,7 +25,10 @@ def distribution_output_from_params(parameters: GluonHyperparameters, target_dim
     if not low_rank:
         likelihood = MultivariateGaussianOutput(dim=target_dim)
     else:
-        likelihood = LowrankMultivariateGaussianOutput(dim=target_dim, rank=min(parameters.rank, target_dim))
+        likelihood = LowrankMultivariateGaussianOutput(
+            dim=target_dim,
+            rank=min(parameters.rank, target_dim) if parameters.rank is not None else target_dim,
+        )
     return likelihood
 
 
@@ -63,7 +66,7 @@ def get_gp_estimator(parameters: GluonHyperparameters, target_dim: int, predicti
                      cdf: bool = True, scaling: bool = False):
     distribution_output = LowrankGPOutput(
         dim=target_dim,
-        rank=min(parameters.rank, target_dim),
+        rank=min(parameters.rank, target_dim) if parameters.rank is not None else target_dim,
         dropout_rate=parameters.dropout_rate
     )
 

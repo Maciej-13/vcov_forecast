@@ -1,6 +1,6 @@
 from vcov.modules.models.gluon_model import trainer_from_params, distribution_output_from_params, \
     get_multivariate_estimator, get_gp_estimator
-from vcov.modules.models.hyperparameters import GluonHyperparameters
+from vcov.modules.models.hyperparameters import GluonHyperparameters, Estimator
 
 from gluonts.mx.trainer import Trainer
 from gluonts.mx.distribution import LowrankMultivariateGaussianOutput, MultivariateGaussianOutput
@@ -11,6 +11,7 @@ from gluonts.model.gpvar import GPVAREstimator
 
 def test_trainer_from_params():
     params = GluonHyperparameters(
+        estimator=Estimator.VAR,
         cell_type="lstm",
         batch_size=24,
         num_cells=20,
@@ -29,6 +30,7 @@ def test_trainer_from_params():
 
 def test_distribution_output_from_params():
     params = GluonHyperparameters(
+        estimator=Estimator.VAR,
         cell_type="lstm",
         batch_size=24,
         num_cells=20,
@@ -45,6 +47,7 @@ def test_distribution_output_from_params():
 
 def test_get_multivariate_estimator():
     params = GluonHyperparameters(
+        estimator=Estimator.VAR,
         cell_type="lstm",
         batch_size=24,
         num_cells=20,
@@ -70,6 +73,7 @@ def test_get_multivariate_estimator():
 
 def test_get_gp_estimator():
     params = GluonHyperparameters(
+        estimator=Estimator.GPVAR,
         cell_type="lstm",
         batch_size=24,
         num_cells=20,

@@ -1,5 +1,6 @@
 from typing import Tuple, List, Optional, Dict, Union
 from dataclasses import dataclass
+from enum import Enum, auto
 
 ParamsDict = Dict[str, Union[str, int, float, Tuple[int, ...]]]
 
@@ -41,12 +42,21 @@ class TCNHyperparameters:
         return self.__dict__
 
 
+class Estimator(Enum):
+    VAR = auto()
+    GPVAR = auto()
+
+
 @dataclass
 class GluonHyperparameters:
+    estimator: Estimator
     cell_type: str
     batch_size: int
     num_cells: int
     num_layers: int
+
+    copula: bool = True
+    scaling: Optional[bool] = False
 
     epochs: int = 100
     dropout_rate: float = 0.1
@@ -63,7 +73,6 @@ class GluonHyperparameters:
     hybridize: bool = False
     target_dim_sample: Optional[int] = None
     lags_seq: Optional[List[int]] = None
-    scaling: Optional[bool] = False
     context_length: Optional[int] = None
     low_rank: bool = False
 

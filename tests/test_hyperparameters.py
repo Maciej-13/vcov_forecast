@@ -1,4 +1,9 @@
-from vcov.modules.models.hyperparameters import LstmHyperparameters, TCNHyperparameters, GluonHyperparameters
+from vcov.modules.models.hyperparameters import (
+    LstmHyperparameters,
+    TCNHyperparameters,
+    GluonHyperparameters,
+    Estimator
+)
 
 
 def test_lstm_hyperparameters():
@@ -131,6 +136,7 @@ def test_tcn_hyperparameters_to_dict():
 
 def test_gluon_hyperparameters():
     params = GluonHyperparameters(
+        estimator=Estimator.VAR,
         cell_type="lstm",
         batch_size=16,
         epochs=100,
@@ -152,6 +158,7 @@ def test_gluon_hyperparameters():
         context_length=12
     )
 
+    assert params.estimator == Estimator.VAR
     assert params.cell_type == 'lstm'
     assert params.batch_size == 16
     assert params.epochs == 100
@@ -175,6 +182,7 @@ def test_gluon_hyperparameters():
 
 def test_gluon_hyperparameters_to_dict():
     params = GluonHyperparameters(
+        estimator=Estimator.VAR,
         cell_type="lstm",
         batch_size=16,
         num_cells=40,
@@ -197,4 +205,4 @@ def test_gluon_hyperparameters_to_dict():
     ).to_dict()
 
     assert isinstance(params, dict)
-    assert len(params) == 20
+    assert len(params) == 22

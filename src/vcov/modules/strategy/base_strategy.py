@@ -11,7 +11,8 @@ from vcov.modules.portfolio.portfolio import Portfolio
 
 class Strategy(ABC):
 
-    def __init__(self, data: DataFrame, portfolio_value: Union[int, float], fee_multiplier: Optional[float]) -> None:
+    def __init__(self, data: DataFrame, portfolio_value: Union[int, float], fee_multiplier: Optional[float],
+                 save_results: str) -> None:
         self._data = data
         self.assets: List[str] = list(data.columns)
         self.portfolio_value = portfolio_value
@@ -19,6 +20,7 @@ class Strategy(ABC):
         self.portfolio = Portfolio(assets=self.assets)
         self.trading = TradeHistory()
         self.fee_multiplier: Optional[float] = fee_multiplier
+        self.__path: str = save_results
 
     @abstractmethod
     def logic(self, counter: int, prices: Series, **kwargs) -> Optional[Union[float, np.ndarray]]:

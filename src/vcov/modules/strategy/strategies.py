@@ -13,6 +13,7 @@ from pypfopt.objective_functions import transaction_cost
 
 from gluonts.dataset.common import MetaData, TrainDatasets, ListDataset
 from gluonts.dataset.multivariate_grouper import MultivariateGrouper
+from gluonts.evaluation import MultivariateEvaluator
 from gluonts.evaluation import make_evaluation_predictions
 
 from vcov.modules.strategy.base_strategy import Strategy
@@ -27,8 +28,11 @@ Orders = Tuple[Dict[str, int], Dict[str, int]]
 
 
 def resolve_allocation(weights: Dict[str, float], prices: Series, portfolio_value: Union[int, float]) -> Allocation:
-    allocation, cash = DiscreteAllocation(weights, prices, portfolio_value).greedy_portfolio()
-    return {k: (0 if v is None else v) for k, v in allocation.items()}, cash
+    try:
+        allocation, cash = DiscreteAllocation(weights, prices, portfolio_value).greedy_portfolio()
+        return {k: (0 if v is None else v) for k, v in allocation.items()}, cash
+    except AssertionError:
+        return {k: 0 for k in weights.keys()}, 0
 
 
 def resolve_order_amounts(old_stocks: Dict[str, int], new_stocks: Dict[str, int]) -> Orders:
@@ -69,8 +73,8 @@ class EquallyWeighted(Strategy):
 class RiskModels(Strategy):
 
     def __init__(self, data: DataFrame, portfolio_value: Union[int, float], fee_multiplier: Optional[float],
-                 window: int, rebalancing: Optional[int]) -> None:
-        super().__init__(data, portfolio_value, fee_multiplier)
+                 window: int, rebalancing: Optional[int], save_results: Optional[str] = None) -> None:
+        super().__init__(data, portfolio_value, fee_multiplier, save_results)
         self.window = window
         self.rebalancing = rebalancing
 
@@ -141,8 +145,9 @@ class RiskModels(Strategy):
 class LstmModels(Strategy):
 
     def __init__(self, data: DataFrame, portfolio_value: Union[int, float], fee_multiplier: Optional[float],
-                 window: int, rebalancing: Optional[int], warmup_period: int) -> None:
-        super().__init__(data, portfolio_value, fee_multiplier)
+                 window: int, rebalancing: Optional[int], warmup_period: int,
+                 save_results: Optional[str] = None) -> None:
+        super().__init__(data, portfolio_value, fee_multiplier, save_results)
         self.window = window
         self.rebalancing = rebalancing
         self.warmup_period = warmup_period
@@ -242,7 +247,7 @@ class LstmModels(Strategy):
             patience=stopping_patience,
             mode='auto',
         )
-        model.fit(
+        history = model.fit(
             train_gen,
             validation_data=val_gen,
             epochs=epochs,
@@ -251,7 +256,8 @@ class LstmModels(Strategy):
             shuffle=False,
             callbacks=[stopping],
         )
-
+        with open(self.save_results, 'a') as f:
+            f.write(f'{history.history}\n')
         predicted: DataFrame = pd.DataFrame(model.predict(val_gen), columns=val_cholesky.columns)
         predicted_matrix: DataFrame = cov.reverse_cholesky_transformation(predicted)
         predicted_matrix = predicted_matrix.tail(len(self.assets))
@@ -262,8 +268,9 @@ class LstmModels(Strategy):
 class GluonModels(Strategy):
 
     def __init__(self, data: DataFrame, portfolio_value: Union[int, float], fee_multiplier: Optional[float],
-                 window: int, rebalancing: Optional[int], warmup_period: int) -> None:
-        super().__init__(data, portfolio_value, fee_multiplier)
+                 window: int, rebalancing: Optional[int], warmup_period: int,
+                 save_results: Optional[str] = None) -> None:
+        super().__init__(data, portfolio_value, fee_multiplier, save_results)
         self.window = window
         self.rebalancing = rebalancing
         self.warmup_period = warmup_period
@@ -382,12 +389,23 @@ class GluonModels(Strategy):
             predictor=predictor,
             num_samples=100,
         )
-
         forecasts = list(forecast_it)
+        tss = list(ts_it)
+
         predicted: DataFrame = pd.DataFrame(
-            {train_cholesky.columns[i]: forecasts[-1].copy_dim(i).mean for i in range(0, 10)}
+            {train_cholesky.columns[i]: forecasts[-1].copy_dim(i).mean for i in range(0, len(train_cholesky.columns))}
         )
         predicted_matrix: DataFrame = cov.reverse_cholesky_transformation(predicted)
         predicted_matrix = predicted_matrix.tail(len(self.assets))
         predicted_matrix.index = predicted_matrix.index.droplevel(0)
+
+        # Evaluations
+        evaluator = MultivariateEvaluator(
+            quantiles=(np.arange(10) / 10.0)[1:], target_agg_funcs={'sum': np.sum}
+        )
+        agg_metrics, item_metrics = evaluator(iter(tss), iter(forecasts), num_series=len(ds.test))
+
+        with open(self.save_results, 'a') as f:
+            f.write(f'{agg_metrics}\n')
+
         return predicted_matrix

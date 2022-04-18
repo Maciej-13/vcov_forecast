@@ -46,6 +46,7 @@ class StrategyParameters:
     returns: str = "mean_historical_return"
     optimize: str = 'min_volatility'
     cov_params: Dict[str, Union[int, str, float]] = field(default_factory=dict)
+    warmup_period: int = 0
     rebalancing: Optional[int] = None
     fee_multiplier: Optional[float] = None
 

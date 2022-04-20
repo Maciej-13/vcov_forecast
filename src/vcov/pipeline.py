@@ -11,7 +11,7 @@ from vcov.modules.models.hyperparameters import Estimator, GluonHyperparameters,
 from vcov.modules.strategy.strategies import EquallyWeighted, RiskModels, LstmModels, GluonModels
 from vcov.modules.strategy.performance import PerformanceStatistics
 
-DATA_PATH = "..."
+DATA_PATH = "E:/PycharmProjects/vcov_forecast/data/dataset/"
 
 
 def pipeline(
@@ -27,10 +27,11 @@ def pipeline(
     with open(DATA_PATH + "clean/filtered_data_0.5_0.01.pickle", "rb") as f:
         data = pickle.load(f)
 
-    with open(DATA_PATH + "top_20.json", "r") as f:
+    # Load selection
+    with open("../../../data/dataset/market_cap_selected.json", "r") as f:
         selection = json.load(f)
 
-    data = Assets(data[selection].loc[data.index > "2017-10-01"])
+    data = Assets(data.loc[data.index > "2018-01-01"])
     try:
         if strategy == 'weighted':
             strategy = EquallyWeighted(
@@ -38,6 +39,7 @@ def pipeline(
                 portfolio_value=strategy_parameters.portfolio_value,
                 fee_multiplier=strategy_parameters.fee_multiplier,
                 save_results=log_file,
+                market_cap_selection=selection
             )
 
             equity_line = strategy.apply_strategy(
@@ -53,6 +55,7 @@ def pipeline(
                 portfolio_value=strategy_parameters.portfolio_value,
                 fee_multiplier=strategy_parameters.fee_multiplier,
                 save_results=log_file,
+                market_cap_selection=selection
             )
 
             equity_line = strategy.apply_strategy(
@@ -128,4 +131,4 @@ def pipeline(
     except Exception as e:
         print(strategy, strategy_parameters, e, sep="\n")
         with open(f'{path}/log.txt', 'a') as f:
-            f.write(f'{e}\n')
+            f.write(f'Error: {e}\n')

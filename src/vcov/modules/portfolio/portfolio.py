@@ -13,7 +13,7 @@ class Portfolio:
             self._weights_validation()
 
     def update_weights(self, weights: Dict[str, float]) -> None:
-        self.weights.update(weights)
+        self.weights = weights
         self._weights_validation()
 
     def update_stocks(self, stocks: Dict[str, int]) -> None:

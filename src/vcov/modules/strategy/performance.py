@@ -29,10 +29,11 @@ class PerformanceStatistics:
 
     @staticmethod
     def maximum_daily_drawdown(prices: Series) -> Series:
-        return (prices.dropna() / prices.dropna().cummax() - 1).cummin()
+        prices = prices.dropna()
+        return ((prices.cummax() - prices) / prices.cummax()).cummax()
 
     def maximum_drawdown(self, prices) -> float:
-        md: float = min(self.maximum_daily_drawdown(prices.dropna()))
+        md: float = max(self.maximum_daily_drawdown(prices.dropna()))
         return md
 
     def information_ratio(self, prices: Series, scale: int = 365) -> float:
@@ -65,4 +66,6 @@ class PerformanceStatistics:
 
     @staticmethod
     def _calculate_r(prices: Series) -> Series:
-        return prices.dropna() / prices.dropna().shift(1) - 1
+        r: Series = prices.dropna() / prices.dropna().shift(1) - 1
+        r = r.replace([np.inf, -np.inf], np.nan)
+        return r

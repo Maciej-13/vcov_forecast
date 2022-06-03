@@ -16,6 +16,7 @@ RISK_MODELS = [
 # Self-defined covariances
 ESTIMATORS = [
     "lstm",
+    "gluon"
 ]
 
 # Combination of covariance matrices

@@ -34,7 +34,7 @@ class Strategy(ABC):
         self.portfolio = Portfolio(assets=self.assets)
         self.trading = TradeHistory()
         self.fee_multiplier: Optional[float] = fee_multiplier
-        self.__path: str = save_results
+        self._path: str = save_results
         self._selection: Dict[str, List[str]] = market_cap_selection
 
     @abstractmethod

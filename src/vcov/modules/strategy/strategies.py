@@ -75,24 +75,26 @@ class EquallyWeighted(Strategy):
 class RiskModels(Strategy):
 
     def __init__(self, data: DataFrame, portfolio_value: Union[int, float], fee_multiplier: Optional[float],
-                 window: int, rebalancing: Optional[int], save_results: Optional[str] = None,
+                 window: int, rebalancing: Optional[int], warmup_period: int, save_results: Optional[str] = None,
                  market_cap_selection: Optional[Dict[str, List[str]]] = None) -> None:
-        super().__init__(data, portfolio_value, fee_multiplier, save_results, market_cap_selection)
+        super().__init__(data, portfolio_value, fee_multiplier, save_results=save_results,
+                         market_cap_selection=market_cap_selection)
         self.window = window
         self.rebalancing = rebalancing
+        self.warmup_period = warmup_period
 
     def logic(self, counter: int, prices: Series, **kwargs) -> Optional[Union[float, np.ndarray]]:
-        if counter < self.window - 1:
+        if counter < self.warmup_period + self.window - 1:
             return None
 
         if self.rebalancing is None:
-            if counter == self.window - 1:
+            if counter == self.warmup_period + self.window - 1:
                 return self._single_logic(prices, **kwargs)
             else:
                 return self._calculate_portfolio_value(prices)
 
         if self.rebalancing is not None:
-            if (counter - (self.window - 1)) % self.rebalancing == 0:
+            if counter == self.warmup_period + self.window - 1 or (counter - (self.window - 1)) % self.rebalancing == 0:
                 return self._single_logic(prices, **kwargs)
             else:
                 return self._calculate_portfolio_value(prices)
@@ -155,8 +157,10 @@ class LstmModels(Strategy):
 
     def __init__(self, data: DataFrame, portfolio_value: Union[int, float], fee_multiplier: Optional[float],
                  window: int, rebalancing: Optional[int], warmup_period: int,
-                 save_results: Optional[str] = None) -> None:
-        super().__init__(data, portfolio_value, fee_multiplier, save_results)
+                 save_results: Optional[str] = None,
+                 market_cap_selection: Optional[Dict[str, List[str]]] = None) -> None:
+        super().__init__(data, portfolio_value, fee_multiplier, save_results=save_results,
+                         market_cap_selection=market_cap_selection)
         self.window = window
         self.rebalancing = rebalancing
         self.warmup_period = warmup_period
@@ -172,15 +176,20 @@ class LstmModels(Strategy):
                 return self._calculate_portfolio_value(prices)
 
         if self.rebalancing is not None:
-            if (counter - (self.window - 1)) % self.rebalancing == 0:
+            if counter == self.warmup_period + self.window - 1 or (counter - (self.window - 1)) % self.rebalancing == 0:
                 return self._single_logic(prices, **kwargs)
             else:
                 return self._calculate_portfolio_value(prices)
 
     def _single_logic(self, prices: Series, **kwargs) -> Union[float, np.ndarray]:
+        if self._selection is not None:
+            all_prices: Series = deepcopy(prices)
+            prices = prices.loc[prices.index.isin(find_last_available_date(self._selection, prices.name))]
         new_weights = self._optimize_weights(prices, **kwargs)
         self.portfolio.update_weights(new_weights)
-        allocation, cash = resolve_allocation(self.portfolio.weights, prices, self.portfolio_value)
+        allocation, cash = resolve_allocation(self.portfolio.weights, prices,
+                                              self.portfolio_value) if self._selection is None else resolve_allocation(
+            self.portfolio.weights, all_prices, self.portfolio_value)
         self.cash = cash
         to_sell, to_buy = resolve_order_amounts(self.portfolio.stocks, allocation)
         self.portfolio.update_stocks(allocation)
@@ -189,7 +198,7 @@ class LstmModels(Strategy):
                 stamp=prices.name,
                 asset=list(to_sell.keys()),
                 quantity=list(to_sell.values()),
-                price=prices,
+                price=prices if self._selection is None else all_prices,
                 buy=False,
                 fee_multiplier=self.fee_multiplier
             )
@@ -198,7 +207,7 @@ class LstmModels(Strategy):
                 stamp=prices.name,
                 asset=list(to_buy.keys()),
                 quantity=list(to_buy.values()),
-                price=prices,
+                price=prices if self._selection is None else all_prices,
                 buy=True,
                 fee_multiplier=self.fee_multiplier
             )
@@ -222,8 +231,9 @@ class LstmModels(Strategy):
         )
         ef = EfficientFrontier(er, sample_cov, weight_bounds=(0, 1))
         if self.fee_multiplier is not None:
-            w_prev = np.fromiter(self.portfolio.weights.values(), dtype=float) if self.portfolio.weights \
-                else [0] * len(self.portfolio.assets)
+            w_prev = np.fromiter({k: self.portfolio.weights[k] if k in self.portfolio.weights.keys() else 0 for k in
+                                  prices.index}.values(), dtype=float) if self.portfolio.weights else [0] * len(
+                prices.index)
             ef.add_objective(transaction_cost, w_prev=w_prev, k=self.fee_multiplier)
         optimizer = getattr(ef, optimize)
         optimizer(**{k: kwargs.pop(k) for k in kwargs if k in inspect.signature(optimizer).parameters.keys()})
@@ -232,7 +242,7 @@ class LstmModels(Strategy):
 
     def _estimate_covariance_matrix(self, prices: DataFrame, epochs: int, batch_size: int, length: int,
                                     stopping_patience: int, **kwargs) -> DataFrame:
-        cov = CovarianceHandler(lookback=self.window, n_assets=len(self.assets))
+        cov = CovarianceHandler(lookback=self.window, n_assets=len(prices.columns))
         train = prices.iloc[:-1]
         val = prices.iloc[-self.window * 2:]
 
@@ -265,11 +275,11 @@ class LstmModels(Strategy):
             shuffle=False,
             callbacks=[stopping],
         )
-        with open(self.__path, 'a') as f:
+        with open(self._path, 'a') as f:
             f.write(f'Model history: {history.history}\n')
         predicted: DataFrame = pd.DataFrame(model.predict(val_gen), columns=val_cholesky.columns)
         predicted_matrix: DataFrame = cov.reverse_cholesky_transformation(predicted)
-        predicted_matrix = predicted_matrix.tail(len(self.assets))
+        predicted_matrix = predicted_matrix.tail(len(prices.columns))
         predicted_matrix.index = predicted_matrix.index.droplevel(0)
         return predicted_matrix
 
@@ -278,8 +288,10 @@ class GluonModels(Strategy):
 
     def __init__(self, data: DataFrame, portfolio_value: Union[int, float], fee_multiplier: Optional[float],
                  window: int, rebalancing: Optional[int], warmup_period: int,
-                 save_results: Optional[str] = None) -> None:
-        super().__init__(data, portfolio_value, fee_multiplier, save_results)
+                 save_results: Optional[str] = None,
+                 market_cap_selection: Optional[Dict[str, List[str]]] = None) -> None:
+        super().__init__(data, portfolio_value, fee_multiplier, save_results=save_results,
+                         market_cap_selection=market_cap_selection)
         self.window = window
         self.rebalancing = rebalancing
         self.warmup_period = warmup_period
@@ -295,15 +307,20 @@ class GluonModels(Strategy):
                 return self._calculate_portfolio_value(prices)
 
         if self.rebalancing is not None:
-            if (counter - (self.window - 1)) % self.rebalancing == 0:
+            if counter == self.warmup_period + self.window - 1 or (counter - (self.window - 1)) % self.rebalancing == 0:
                 return self._single_logic(prices, **kwargs)
             else:
                 return self._calculate_portfolio_value(prices)
 
     def _single_logic(self, prices: Series, **kwargs) -> Union[float, np.ndarray]:
+        if self._selection is not None:
+            all_prices: Series = deepcopy(prices)
+            prices = prices.loc[prices.index.isin(find_last_available_date(self._selection, prices.name))]
         new_weights = self._optimize_weights(prices, **kwargs)
         self.portfolio.update_weights(new_weights)
-        allocation, cash = resolve_allocation(self.portfolio.weights, prices, self.portfolio_value)
+        allocation, cash = resolve_allocation(self.portfolio.weights, prices,
+                                              self.portfolio_value) if self._selection is None else resolve_allocation(
+            self.portfolio.weights, all_prices, self.portfolio_value)
         self.cash = cash
         to_sell, to_buy = resolve_order_amounts(self.portfolio.stocks, allocation)
         self.portfolio.update_stocks(allocation)
@@ -312,7 +329,7 @@ class GluonModels(Strategy):
                 stamp=prices.name,
                 asset=list(to_sell.keys()),
                 quantity=list(to_sell.values()),
-                price=prices,
+                price=prices if self._selection is None else all_prices,
                 buy=False,
                 fee_multiplier=self.fee_multiplier
             )
@@ -342,8 +359,9 @@ class GluonModels(Strategy):
         )
         ef = EfficientFrontier(er, sample_cov, weight_bounds=(0, 1))
         if self.fee_multiplier is not None:
-            w_prev = np.fromiter(self.portfolio.weights.values(), dtype=float) if self.portfolio.weights \
-                else [0] * len(self.portfolio.assets)
+            w_prev = np.fromiter({k: self.portfolio.weights[k] if k in self.portfolio.weights.keys() else 0 for k in
+                                  prices.index}.values(), dtype=float) if self.portfolio.weights else [0] * len(
+                prices.index)
             ef.add_objective(transaction_cost, w_prev=w_prev, k=self.fee_multiplier)
         optimizer = getattr(ef, optimize)
         optimizer(**{k: kwargs.pop(k) for k in kwargs if k in inspect.signature(optimizer).parameters.keys()})
@@ -352,7 +370,7 @@ class GluonModels(Strategy):
 
     def _estimate_covariance_matrix(self, prices: DataFrame, parameters: GluonHyperparameters,
                                     **kwargs) -> DataFrame:
-        cov = CovarianceHandler(lookback=self.window, n_assets=len(self.assets))
+        cov = CovarianceHandler(lookback=self.window, n_assets=len(prices.columns))
         train = prices.iloc[:-1]
         val = prices.iloc[-self.window * 2:]
 
@@ -414,7 +432,7 @@ class GluonModels(Strategy):
         )
         agg_metrics, item_metrics = evaluator(iter(tss), iter(forecasts), num_series=len(ds.test))
 
-        with open(self.__path, 'a') as f:
+        with open(self._path, 'a') as f:
             f.write(f'Model history: {agg_metrics}\n')
 
         return predicted_matrix

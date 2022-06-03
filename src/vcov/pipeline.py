@@ -28,7 +28,7 @@ def pipeline(
         data = pickle.load(f)
 
     # Load selection
-    with open("../../../data/dataset/market_cap_selected.json", "r") as f:
+    with open(f"{DATA_PATH}/market_cap_selected.json", "r") as f:
         selection = json.load(f)
 
     data = Assets(data.loc[data.index > "2018-01-01"])
@@ -55,7 +55,8 @@ def pipeline(
                 portfolio_value=strategy_parameters.portfolio_value,
                 fee_multiplier=strategy_parameters.fee_multiplier,
                 save_results=log_file,
-                market_cap_selection=selection
+                market_cap_selection=selection,
+                warmup_period=strategy_parameters.warmup_period
             )
 
             equity_line = strategy.apply_strategy(
@@ -74,6 +75,7 @@ def pipeline(
                 rebalancing=strategy_parameters.rebalancing,
                 warmup_period=strategy_parameters.warmup_period,
                 save_results=log_file,
+                market_cap_selection=selection
             )
 
             equity_line = strategy.apply_strategy(
@@ -103,6 +105,7 @@ def pipeline(
                 rebalancing=strategy_parameters.rebalancing,
                 warmup_period=strategy_parameters.warmup_period,
                 save_results=log_file,
+                market_cap_selection=selection,
             )
 
             equity_line = strategy.apply_strategy(
